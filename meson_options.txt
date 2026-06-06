@@ -1,9 +1,8 @@
 # ── Build personality ──────────────────────────────────────────────────────────
-# By default we enable tests. These can be disabled by passing
-# -Dbuild_tests=false to meson.
+# By default tests are disabled. Enable them with -Dbuild_tests=true.
 option(
   'build_tests',
   type: 'boolean',
-  value: true,
+  value: false,
   description: 'Build and run unit tests',
 )

@@ -1,5 +1,7 @@
 # status
 
+[![CI](https://github.com/aajll/status/actions/workflows/ci.yml/badge.svg)](https://github.com/aajll/status/actions/workflows/ci.yml)
+
 A lightweight C11 status register library for embedded systems.
 Tracks faults, warnings, and info bits using banked bitfields encoded as compact 16-bit status IDs.
 

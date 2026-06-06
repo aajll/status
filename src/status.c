@@ -1,9 +1,10 @@
-/*
- * @copyright MIT
+/**
+ * SPDX-License-Identifier: MIT
  *
  * @file: status.c
  *
- * @brief Implementation of core status tracking functionality.
+ * @brief
+ *    Implementation of core status tracking functionality.
  */
 
 /* ================ INCLUDES ================================================ */

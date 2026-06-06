@@ -1,10 +1,11 @@
-/*
- * @copyright MIT
+/**
+ * SPDX-License-Identifier: MIT
  *
  * @file: status.h
  *
- * @brief Provides runtime logic for setting, clearing, and querying fault and
- *        warning status bits defined by the application.
+ * @brief
+ *    Provides runtime logic for setting, clearing, and querying fault and
+ *    warning status bits defined by the application.
  */
 
 #ifndef STATUS_H
