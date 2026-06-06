@@ -3,7 +3,6 @@
 
 # Object files
 *.o
-*.ko
 *.obj
 *.elf
 
@@ -34,7 +33,6 @@
 *.app
 *.i*86
 *.x86_64
-*.hex
 
 # Debug files
 *.dSYM/
@@ -42,16 +40,7 @@
 *.idb
 *.pdb
 
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
-
-#clang-format
+# clang-format
 .cache/
 
 # Meson build output
