@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-06-26
+
 ### Changed
 
 - Reworked the concurrency model: single-bit set/clear is now a lock-free atomic read-modify-write via an auto-discovered backend (`__atomic` → C11 `<stdatomic.h>` → uniprocessor fallback), mirroring `seqlock`. The mandatory `STATUS_ENTER_CRITICAL` / `STATUS_EXIT_CRITICAL` hooks and their unconditional `#warning` are gone; the hooks now apply only to the `STATUS_USE_NO_ATOMICS` fallback and default to silent no-ops. The atomic backends statically assert lock-free bank and callback-pointer storage so unsupported targets fail loudly. Backend selection and `NUM_STATUS_BANKS` moved to a new `status_conf.h`.
