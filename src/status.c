@@ -89,22 +89,6 @@ get_banks_ro(enum status_class cls)
         return get_banks_mut(cls); /* adds const qualifier */
 }
 
-/* Tracker for the last-set ID of a class, or NULL for an invalid class. */
-static inline STATUS_ATOMIC_QUAL uint16_t *
-get_last_id(enum status_class cls)
-{
-        STATUS_ATOMIC_QUAL uint16_t *result;
-
-        switch (cls) {
-        case STATUS_CLASS_FAULT: result = &last_fault_id; break;
-        case STATUS_CLASS_WARNING: result = &last_warning_id; break;
-        case STATUS_CLASS_INFO: result = &last_info_id; break;
-        default: result = NULL; break;
-        }
-
-        return result;
-}
-
 static void
 invoke_err_cb(status_err_t err, uint16_t id)
 {
@@ -121,65 +105,64 @@ invoke_err_cb(status_err_t err, uint16_t id)
         }
 }
 
+/*
+ * The private bit helpers operate on an already-resolved bank array (and, for
+ * set_bit, the matching last-set tracker). The public wrappers pass the storage
+ * for a fixed, valid class, so these pointers are never NULL and no class
+ * validation is needed here; the only runtime check is the user-supplied bank
+ * range. Class validation lives in the public functions that take a class
+ * argument (status_any, status_clear_all, status_snapshot).
+ */
 static void
-set_bit(uint16_t id, enum status_class cls)
+set_bit(STATUS_ATOMIC_QUAL uint16_t *banks, STATUS_ATOMIC_QUAL uint16_t *last,
+        uint16_t id)
 {
         uint16_t bank = status_bank(id);
-        STATUS_ATOMIC_QUAL uint16_t *b = get_banks_mut(cls);
 
         if (bank >= NUM_STATUS_BANKS) {
                 invoke_err_cb(STATUS_ERR_INVALID_BANK, id);
-        } else if (b == NULL) {
-                invoke_err_cb(STATUS_ERR_INVALID_ID, id);
         } else {
                 uint16_t bit = status_bit(id);
                 uint16_t mask = (uint16_t)((uint32_t)1u << (uint32_t)bit);
 
-                STATUS_ATOMIC_OR(&b[bank], mask);
+                STATUS_ATOMIC_OR(&banks[bank], mask);
                 /*
                  * The tracker store is a separate atomic op, so the bit and the
                  * "last set" record are not updated as one transaction; the
                  * tracker is a best-effort most-recent-wins audit hint.
                  */
-                STATUS_ATOMIC_QUAL uint16_t *last = get_last_id(cls);
                 STATUS_ATOMIC_STORE(last, id);
         }
 }
 
 static void
-clear_bit(uint16_t id, enum status_class cls)
+clear_bit(STATUS_ATOMIC_QUAL uint16_t *banks, uint16_t id)
 {
         uint16_t bank = status_bank(id);
-        STATUS_ATOMIC_QUAL uint16_t *b = get_banks_mut(cls);
 
         if (bank >= NUM_STATUS_BANKS) {
                 invoke_err_cb(STATUS_ERR_INVALID_BANK, id);
-        } else if (b == NULL) {
-                invoke_err_cb(STATUS_ERR_INVALID_ID, id);
         } else {
                 uint16_t bit = status_bit(id);
                 uint16_t mask = (uint16_t)((uint32_t)1u << (uint32_t)bit);
 
-                STATUS_ATOMIC_AND(&b[bank], (uint16_t)(0xFFFFu ^ mask));
+                STATUS_ATOMIC_AND(&banks[bank], (uint16_t)(0xFFFFu ^ mask));
         }
 }
 
 static bool
-is_bit_set(uint16_t id, enum status_class cls)
+is_bit_set(const STATUS_ATOMIC_QUAL uint16_t *banks, uint16_t id)
 {
         uint16_t bank = status_bank(id);
-        const STATUS_ATOMIC_QUAL uint16_t *b = get_banks_ro(cls);
         bool result = false;
 
         if (bank >= NUM_STATUS_BANKS) {
                 invoke_err_cb(STATUS_ERR_INVALID_BANK, id);
-        } else if (b == NULL) {
-                invoke_err_cb(STATUS_ERR_INVALID_ID, id);
         } else {
                 uint16_t bit = status_bit(id);
                 uint16_t mask = (uint16_t)((uint32_t)1u << (uint32_t)bit);
 
-                result = (STATUS_ATOMIC_LOAD(&b[bank]) & mask) != 0u;
+                result = (STATUS_ATOMIC_LOAD(&banks[bank]) & mask) != 0u;
         }
 
         return result;
@@ -214,55 +197,55 @@ status_set_err_callback(status_err_cb_t cb)
 void
 status_set_warning(uint16_t id)
 {
-        set_bit(id, STATUS_CLASS_WARNING);
+        set_bit(warning_banks, &last_warning_id, id);
 }
 
 void
 status_set_fault(uint16_t id)
 {
-        set_bit(id, STATUS_CLASS_FAULT);
+        set_bit(fault_banks, &last_fault_id, id);
 }
 
 void
 status_set_info(uint16_t id)
 {
-        set_bit(id, STATUS_CLASS_INFO);
+        set_bit(info_banks, &last_info_id, id);
 }
 
 void
 status_clear_warning(uint16_t id)
 {
-        clear_bit(id, STATUS_CLASS_WARNING);
+        clear_bit(warning_banks, id);
 }
 
 void
 status_clear_fault(uint16_t id)
 {
-        clear_bit(id, STATUS_CLASS_FAULT);
+        clear_bit(fault_banks, id);
 }
 
 void
 status_clear_info(uint16_t id)
 {
-        clear_bit(id, STATUS_CLASS_INFO);
+        clear_bit(info_banks, id);
 }
 
 bool
 status_is_warning_set(uint16_t id)
 {
-        return is_bit_set(id, STATUS_CLASS_WARNING);
+        return is_bit_set(warning_banks, id);
 }
 
 bool
 status_is_fault_set(uint16_t id)
 {
-        return is_bit_set(id, STATUS_CLASS_FAULT);
+        return is_bit_set(fault_banks, id);
 }
 
 bool
 status_is_info_set(uint16_t id)
 {
-        return is_bit_set(id, STATUS_CLASS_INFO);
+        return is_bit_set(info_banks, id);
 }
 
 bool
