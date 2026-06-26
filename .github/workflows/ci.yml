@@ -59,6 +59,50 @@ jobs:
           path: build/meson-logs/testlog.txt
 
   # ---------------------------------------------------------------------------
+  # ThreadSanitizer gate for the concurrent lost-update test. TSan and ASan are
+  # mutually exclusive, so this is a dedicated job. The library uses relaxed
+  # atomics, so a clean run proves the bit operations are genuinely atomic
+  # rather than a benign-looking data race.
+  # ---------------------------------------------------------------------------
+  tsan:
+    name: "ThreadSanitizer"
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install ninja
+        run: sudo apt-get update -q && sudo apt-get install -y ninja-build
+
+      - name: Install meson
+        run: pip install meson
+
+      - name: Configure (debug + thread sanitizer)
+        run: >
+          meson setup build-tsan
+          --buildtype=debug
+          -Dbuild_tests=true
+          -Db_sanitize=thread
+
+      - name: Build
+        run: meson compile -C build-tsan
+
+      - name: Test
+        run: meson test -C build-tsan --verbose
+
+      - name: Upload test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testlog-tsan
+          path: build-tsan/meson-logs/testlog.txt
+
+  # ---------------------------------------------------------------------------
   # Verify the library compiles cleanly in release mode (no tests, no
   # sanitizers) - the configuration a downstream project would use.
   # ---------------------------------------------------------------------------
@@ -112,12 +156,18 @@ jobs:
       - name: Install meson and gcovr
         run: pip install meson gcovr
 
+      # -fprofile-update=atomic makes gcov's counter increments atomic. The
+      # concurrency test exercises the same instrumented branches from multiple
+      # threads; with the default non-atomic counters those updates race, the
+      # arc counts become inconsistent, and gcov derives negative branch counts
+      # that abort the report (gcc bug 68080). Atomic updates keep them sane.
       - name: Configure (coverage)
         run: >
           meson setup build
           --buildtype=debug
           -Dbuild_tests=true
           -Db_coverage=true
+          -Dc_args=-fprofile-update=atomic
 
       - name: Build
         run: meson compile -C build

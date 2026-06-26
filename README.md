@@ -11,7 +11,8 @@ Tracks faults, warnings, and info bits using banked bitfields encoded as compact
 - **Compact IDs** - 16-bit IDs encode both bank and bit index via `STATUS_ENCODE`
 - **Three status classes** - Separate fault, warning, and info registers
 - **No dynamic memory** - Fixed-size operations, no `malloc` / `free`
-- **Critical section hooks** - User-supplied macros for interrupt-safe access
+- **Atomic bit operations** - Set/clear of a single bit is a lock-free atomic read-modify-write; interrupt- and core-safe with no caller hooks
+- **MISRA-oriented** - no VLAs, no dynamic allocation, written with MISRA C:2023 / IEC 61508 in mind
 - **Error callbacks** - Runtime notification of invalid IDs or null pointers
 - **Snapshot API** - Bulk-copy registers for logging or diagnostics
 
@@ -93,23 +94,25 @@ void check_system(void)
 
 ## Configuration
 
-All macros can be overridden before including the header (e.g. via compiler flags or a config header):
+All options can be overridden before including the header (e.g. via compiler flags or a `config/status_conf.h` placed earlier on the include path):
 
-| Macro | Description | Default |
-|---|---|---|
-| `NUM_STATUS_BANKS` | Number of `uint16_t` banks per status class | `12` |
-| `STATUS_ENTER_CRITICAL()` | Enter critical section (disable interrupts) | no-op |
-| `STATUS_EXIT_CRITICAL()` | Exit critical section (restore interrupts) | no-op |
+| Option                                                                        | Description                                                                       | Default |
+| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------- |
+| `NUM_STATUS_BANKS`                                                            | Number of `uint16_t` banks per status class                                       | `12`    |
+| `STATUS_USE_GNU_ATOMICS` / `STATUS_USE_C11_ATOMICS` / `STATUS_USE_NO_ATOMICS` | Force the atomic backend instead of auto-discovery                                | auto    |
+| `STATUS_ENTER_CRITICAL()` / `STATUS_EXIT_CRITICAL()`                          | Critical-section hooks, consulted **only** on the `STATUS_USE_NO_ATOMICS` backend | no-op   |
 
 ## Concurrency
 
-The library performs read-modify-write operations on `volatile` arrays. These are **not** atomic on their own.
+Setting or clearing a single status bit is a genuine atomic read-modify-write on the bank word, so one context may set a bit while another clears a different bit in the same bank without either update being lost. On the two hardware-backed backends this is interrupt- and core-safe by construction, and **no caller-supplied critical section is required** for per-bit operations.
 
-Define `STATUS_ENTER_CRITICAL` and `STATUS_EXIT_CRITICAL` to protect access whenever status bits are read or written from multiple execution contexts (e.g. ISR and main loop).
+The atomic mechanism is chosen at compile time in `status_conf.h`, auto-discovered as GCC/Clang `__atomic` → C11 `<stdatomic.h>` → a degenerate uniprocessor fallback. The two atomic backends statically assert that the bank word (`uint16_t`) and the error-callback pointer are _always_ lock-free on the target: a target that cannot satisfy that contract fails to compile rather than silently pulling in a hidden lock.
 
-The macros must **save and restore** interrupt state rather than unconditionally enabling interrupts on exit. Blindly calling `__enable_irq()` in `STATUS_EXIT_CRITICAL` will re-enable interrupts even if the caller had already disabled them before entering the library, corrupting any outer critical section.
+Atomicity is **per call, not per logical group**. A multi-bit observation such as `status_any()` or `status_snapshot()` reads each bank atomically but is not one consistent instant of the whole class, and a set-then-read across two API calls is not a single transaction. A caller that needs grouped atomicity must serialise the group itself.
 
-ARM Cortex-M example using CMSIS:
+### Targets without lock-free atomics
+
+On a toolchain with no `<stdatomic.h>` and no `__atomic` builtins (or where 16-bit atomics are not lock-free, e.g. some Cortex-M0-class cores), select `STATUS_USE_NO_ATOMICS` and supply the critical-section hooks. They are consulted only on this backend, must be defined as a matched pair, and must **save and restore** interrupt state rather than unconditionally re-enabling interrupts on exit:
 
 ```c
 /* Save PRIMASK, then disable interrupts */
@@ -120,8 +123,6 @@ ARM Cortex-M example using CMSIS:
 #define STATUS_EXIT_CRITICAL() \
         __set_PRIMASK(_status_irq_state)
 ```
-
-`STATUS_ENTER_CRITICAL` and `STATUS_EXIT_CRITICAL` are always used as a matched pair within the same block scope, so the local variable declared by `STATUS_ENTER_CRITICAL` is visible to `STATUS_EXIT_CRITICAL`.
 
 ## Building
 
@@ -213,11 +214,11 @@ static inline uint16_t status_bit(uint16_t id);   /* extract bit index  */
 
 ## Notes
 
-| Topic | Note |
-|---|---|
-| **Memory** | All storage is statically allocated; no heap use |
-| **Thread safety** | Not thread-safe by default; supply `STATUS_ENTER_CRITICAL` / `STATUS_EXIT_CRITICAL` |
-| **Error handling** | Invalid IDs invoke the registered error callback (if any) and are otherwise ignored |
-| **Version header** | `status_version.h` is auto-generated by Meson and placed in the build output directory |
-| **Status classes** | Three independent register sets: `STATUS_CLASS_FAULT`, `STATUS_CLASS_WARNING`, `STATUS_CLASS_INFO` |
+| Topic                 | Note                                                                                                                                                                                                                                                                                                                                    |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Memory**            | All storage is statically allocated; no heap use                                                                                                                                                                                                                                                                                        |
+| **Thread safety**     | Single-bit set/clear is atomic and lock-free on the default backends; multi-bit observations are not a single consistent snapshot. See [Concurrency](#concurrency)                                                                                                                                                                      |
+| **Error handling**    | Invalid IDs invoke the registered error callback (if any) and are otherwise ignored                                                                                                                                                                                                                                                     |
+| **Version header**    | `status_version.h` is auto-generated by Meson and placed in the build output directory                                                                                                                                                                                                                                                  |
+| **Status classes**    | Three independent register sets: `STATUS_CLASS_FAULT`, `STATUS_CLASS_WARNING`, `STATUS_CLASS_INFO`                                                                                                                                                                                                                                      |
 | **ID class contract** | Status IDs are plain `uint16_t` values encoding only bank + bit. The library cannot enforce at compile time that a fault ID is passed to `status_set_fault()` rather than `status_set_warning()`. Use the naming convention (`STATUS_ID_FAULT_*`, `STATUS_ID_WARN_*`, `STATUS_ID_INFO_*`) and code review to prevent cross-class usage. |

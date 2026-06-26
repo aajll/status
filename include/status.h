@@ -4,8 +4,50 @@
  * @file: status.h
  *
  * @brief
- *    Provides runtime logic for setting, clearing, and querying fault and
- *    warning status bits defined by the application.
+ *    Provides runtime logic for setting, clearing, and querying fault,
+ *    warning, and info status bits defined by the application.
+ *
+ * @details
+ *    A banked-bitfield status register: faults, warnings, and info bits are
+ *    stored as arrays of 16-bit banks and addressed by compact encoded IDs.
+ *
+ *    ## MISRA C:2023 / IEC 61508 awareness
+ *
+ *    The implementation is written with MISRA C:2023 in mind and is intended
+ *    to be used in IEC 61508 environments. The codebase is not formally
+ *    certified. The one intentional, repository-wide advisory deviation is
+ *    Rule 15.5 (single point of exit); guard clauses use early @c return at
+ *    API boundaries.
+ *
+ *    ## Concurrency model and threading contract
+ *
+ *    Setting or clearing a single status bit is performed as an atomic
+ *    read-modify-write on the bank word, so one context may set a bit while
+ *    another clears a different bit in the same bank without either update
+ *    being lost. This is interrupt- and core-safe by construction on the two
+ *    hardware-backed atomic backends; @b no caller-supplied critical section
+ *    is required for the per-bit operations.
+ *
+ *    Atomicity is per call, not per logical group. A multi-bit observation
+ *    such as @c status_any or @c status_snapshot reads each bank atomically
+ *    but is not a single consistent snapshot of the whole class, and a
+ *    set-then-read sequence across two API calls is not one transaction. A
+ *    caller that needs grouped atomicity must serialise the group itself.
+ *
+ *    Memory ordering (known limitation): bit operations use the @e relaxed
+ *    order. A set or cleared bit therefore establishes no happens-before
+ *    relationship with any other memory, so a consumer that observes a bit is
+ *    not guaranteed to observe data the producer wrote before setting it.
+ *    This is intentional for a standalone status register; if a bit must
+ *    publish or acquire companion state, the caller must add its own fence.
+ *
+ *    The atomic mechanism is selected at compile time in @c status_conf.h:
+ *    GCC/Clang @c __atomic, C11 @c <stdatomic.h>, or a degenerate
+ *    uniprocessor fallback that recovers interrupt atomicity through the
+ *    optional STATUS_ENTER_CRITICAL / STATUS_EXIT_CRITICAL hooks. The two
+ *    atomic backends statically assert that the bank and tracker storage are
+ *    always lock-free on the target, so a target that cannot satisfy that
+ *    contract fails to compile rather than degrading silently.
  */
 
 #ifndef STATUS_H
@@ -18,6 +60,8 @@ extern "C" {
 
 /* ================ INCLUDES ================================================ */
 
+#include "status_conf.h"
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -26,20 +70,10 @@ extern "C" {
 
 /* ---------------  Configuration ------------------------------------------- */
 
-/**
- * @def NUM_STATUS_BANKS
- * @brief The number of internal banks available for fault and warning bits.
- *
- * @details
- *    Each bank holds 16 bits. Users must ensure that any status ID encoded
- *    via `STATUS_ENCODE(bank, bit)` uses a `bank` value less than this.
- *
- * @note
- *    This value must match the maximum `bank + 1` used in status_ids.h.
+/*
+ * NUM_STATUS_BANKS and the atomic backend live in status_conf.h so a consumer
+ * can override them without forking this header.
  */
-#ifndef NUM_STATUS_BANKS
-#define NUM_STATUS_BANKS (12u)
-#endif
 
 /**
  * @def NUM_STATUS_BITS
@@ -58,26 +92,6 @@ extern "C" {
  *       and is therefore not a valid application-defined status ID.
  */
 #define STATUS_UNSET_ID (0xFFFFu)
-
-/* ---------------  Critical Sections --------------------------------------- */
-
-/**
- * @brief Enter critical section (disable interrupts).
- * @note Must be defined by the user for thread-safe operation.
- */
-#ifndef STATUS_ENTER_CRITICAL
-#warning "STATUS_ENTER_CRITICAL not defined; library is NOT interrupt-safe"
-#define STATUS_ENTER_CRITICAL()
-#endif
-
-/**
- * @brief Exit critical section (restore interrupts).
- * @note Must be defined by the user for thread-safe operation.
- */
-#ifndef STATUS_EXIT_CRITICAL
-#warning "STATUS_EXIT_CRITICAL not defined; library is NOT interrupt-safe"
-#define STATUS_EXIT_CRITICAL()
-#endif
 
 /* ================ STRUCTURES ============================================== */
 
@@ -106,6 +120,41 @@ typedef enum {
  * @brief Callback function type for error handling.
  */
 typedef void (*status_err_cb_t)(status_err_t err, uint16_t id);
+
+/* ================ COMPILE-TIME GUARANTEES ================================= */
+
+/*
+ * The atomic backends rely on the bank word (uint16_t) and the error-callback
+ * pointer being *always* lock-free on the target; otherwise a hidden global
+ * lock (or a libatomic call that may not exist on bare metal) would be pulled
+ * in behind the set/clear path. Degrade loudly, not silently: a target that
+ * cannot satisfy this must select STATUS_USE_NO_ATOMICS and supply the
+ * critical-section hooks instead.
+ */
+#if defined(STATUS_USE_GNU_ATOMICS)
+/* __atomic_always_lock_free is a compile-time constant but not a "standard"
+ * integer constant expression, so -Wpedantic objects to it inside a
+ * _Static_assert; suppress just that diagnostic here. */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+_Static_assert(__atomic_always_lock_free(sizeof(uint16_t), 0),
+               "status: uint16_t bank storage is not lock-free on this target");
+_Static_assert(
+    __atomic_always_lock_free(sizeof(status_err_cb_t), 0),
+    "status: error-callback pointer is not lock-free on this target");
+#pragma GCC diagnostic pop
+#elif defined(STATUS_USE_C11_ATOMICS)
+/* The C11 path has no size-based lock-free query (atomic_is_lock_free is a
+ * runtime call), so match the bank width to the matching ATOMIC_*_LOCK_FREE
+ * macro and require "always lock-free" (== 2). */
+_Static_assert(
+    (sizeof(uint16_t) == sizeof(short) && ATOMIC_SHORT_LOCK_FREE == 2)
+        || (sizeof(uint16_t) == sizeof(int) && ATOMIC_INT_LOCK_FREE == 2),
+    "status: uint16_t bank storage is not always-lock-free on this target");
+_Static_assert(
+    ATOMIC_POINTER_LOCK_FREE == 2,
+    "status: error-callback pointer is not always-lock-free on this target");
+#endif
 
 /* ================ MACROS ================================================== */
 
@@ -167,128 +216,224 @@ status_bit(uint16_t id)
         return (uint16_t)(id & 0x0Fu);
 }
 
+/*
+ * Error model (applies to every public function below): no function ever
+ * dereferences a bad pointer or accesses storage out of range. Invalid input
+ * (an unrecognised class, an out-of-range bank, or a NULL / zero-length
+ * buffer) is reported through the registered error callback and is otherwise a
+ * no-op: setters and clearers change nothing, queries return false, and the
+ * trackers are untouched. With no callback registered, invalid input is
+ * silently ignored.
+ */
+
 /**
- * @brief Initialise the status module.
+ * @brief Initialise the status module: clear all banks and reset all trackers.
  *
- * @note Clears all register banks and resets the last-set ID trackers for
- *       every class. The registered error callback is intentionally preserved
- *       so that errors occurring during re-initialisation are still reported.
+ * @note Resets every register bank and the last-set ID tracker of all three
+ *       classes to STATUS_UNSET_ID. The registered error callback is preserved
+ *       so that errors during re-initialisation are still reported.
+ *
+ * @warning Not a transaction: status_init() issues many individual atomic
+ *          stores. Call it before any concurrent producer is active (start-up
+ *          or a coordinated quiesce), not while another context may be setting
+ *          bits.
  */
 void status_init(void);
 
 /**
- * @brief Set a callback for handling errors (e.g. invalid IDs).
+ * @brief Register, replace, or clear the error callback.
  *
- * @param cb        Function pointer to the error handler. Pass NULL to
- *                  deregister the current callback; subsequent errors will be
- *                  silently ignored until a new callback is registered.
+ * @param cb  Function pointer to the error handler, or NULL to deregister.
+ *            The pointer is stored atomically, so it may be changed while other
+ *            contexts are running.
+ *
+ * @note Execution context: the callback is invoked synchronously from whichever
+ *       context hit the error, which may be an ISR (e.g. status_set_fault()
+ *       called from an interrupt handler). It must be short, non-blocking, and
+ *       must not assume task context. It runs outside any internal lock and may
+ *       safely re-enter the status API.
  */
 void status_set_err_callback(status_err_cb_t cb);
 
 /**
- * @brief Set the given warning status bit.
+ * @brief Set the given warning status bit and update the warning tracker.
+ *
+ * @param id  Status ID from STATUS_ENCODE(); its bank must be
+ *            < NUM_STATUS_BANKS.
+ *
+ * @note Atomic, interrupt- and core-safe (see the file-level concurrency
+ *       contract). An out-of-range bank invokes the error callback with
+ *       STATUS_ERR_INVALID_BANK and changes nothing.
  */
 void status_set_warning(uint16_t id);
 
 /**
- * @brief Set the given fault status bit.
+ * @brief Set the given fault status bit and update the fault tracker.
+ *
+ * @param id  Status ID from STATUS_ENCODE(); its bank must be
+ *            < NUM_STATUS_BANKS.
+ *
+ * @note Atomic, interrupt- and core-safe. An out-of-range bank invokes the
+ *       error callback with STATUS_ERR_INVALID_BANK and changes nothing.
  */
 void status_set_fault(uint16_t id);
 
 /**
- * @brief Set the given info status bit.
+ * @brief Set the given info status bit and update the info tracker.
+ *
+ * @param id  Status ID from STATUS_ENCODE(); its bank must be
+ *            < NUM_STATUS_BANKS.
+ *
+ * @note Atomic, interrupt- and core-safe. An out-of-range bank invokes the
+ *       error callback with STATUS_ERR_INVALID_BANK and changes nothing.
  */
 void status_set_info(uint16_t id);
 
 /**
  * @brief Clear the given warning status bit.
  *
- * @note The last-set ID tracker returned by status_last_warning() is not
- *       modified. Call status_init() to reset it.
+ * @param id  Status ID from STATUS_ENCODE(); its bank must be
+ *            < NUM_STATUS_BANKS.
+ *
+ * @note Atomic, interrupt- and core-safe. The status_last_warning() tracker is
+ *       NOT modified; call status_init() to reset it. An out-of-range bank
+ *       invokes the error callback with STATUS_ERR_INVALID_BANK.
  */
 void status_clear_warning(uint16_t id);
 
 /**
  * @brief Clear the given fault status bit.
  *
- * @note The last-set ID tracker returned by status_last_fault() is not
- *       modified. Call status_init() to reset it.
+ * @param id  Status ID from STATUS_ENCODE(); its bank must be
+ *            < NUM_STATUS_BANKS.
+ *
+ * @note Atomic, interrupt- and core-safe. The status_last_fault() tracker is
+ *       NOT modified; call status_init() to reset it. An out-of-range bank
+ *       invokes the error callback with STATUS_ERR_INVALID_BANK.
  */
 void status_clear_fault(uint16_t id);
 
 /**
  * @brief Clear the given info status bit.
  *
- * @note The last-set ID tracker returned by status_last_info() is not
- *       modified. Call status_init() to reset it.
+ * @param id  Status ID from STATUS_ENCODE(); its bank must be
+ *            < NUM_STATUS_BANKS.
+ *
+ * @note Atomic, interrupt- and core-safe. The status_last_info() tracker is
+ *       NOT modified; call status_init() to reset it. An out-of-range bank
+ *       invokes the error callback with STATUS_ERR_INVALID_BANK.
  */
 void status_clear_info(uint16_t id);
 
 /**
  * @brief Check whether a given warning status bit is set.
+ *
+ * @param id  Status ID from STATUS_ENCODE(); its bank must be
+ *            < NUM_STATUS_BANKS.
+ *
+ * @return true if the bit is set; false if it is clear or @p id is invalid.
+ *
+ * @note An out-of-range bank invokes the error callback with
+ *       STATUS_ERR_INVALID_BANK and returns false.
  */
 bool status_is_warning_set(uint16_t id);
 
 /**
  * @brief Check whether a given fault status bit is set.
+ *
+ * @param id  Status ID from STATUS_ENCODE(); its bank must be
+ *            < NUM_STATUS_BANKS.
+ *
+ * @return true if the bit is set; false if it is clear or @p id is invalid.
+ *
+ * @note An out-of-range bank invokes the error callback with
+ *       STATUS_ERR_INVALID_BANK and returns false.
  */
 bool status_is_fault_set(uint16_t id);
 
 /**
  * @brief Check whether a given info status bit is set.
+ *
+ * @param id  Status ID from STATUS_ENCODE(); its bank must be
+ *            < NUM_STATUS_BANKS.
+ *
+ * @return true if the bit is set; false if it is clear or @p id is invalid.
+ *
+ * @note An out-of-range bank invokes the error callback with
+ *       STATUS_ERR_INVALID_BANK and returns false.
  */
 bool status_is_info_set(uint16_t id);
 
 /**
  * @brief Check whether any bit in the given class is set.
  *
- * @note Holds the critical section for the duration of the bank scan
- *       (O(NUM_STATUS_BANKS) with early exit). Keep NUM_STATUS_BANKS small
- *       if this is called from time-critical contexts.
+ * @param cls  Status class to scan.
+ *
+ * @return true if at least one bit in @p cls is set; false if none are or
+ *         @p cls is unrecognised.
+ *
+ * @note Reads each bank atomically (O(NUM_STATUS_BANKS) with early exit) but is
+ *       not a single consistent snapshot of the class: a bit set in an
+ *       already-scanned bank after the scan passed it is not observed.
+ * @note An unrecognised @p cls invokes the error callback with
+ *       STATUS_ERR_INVALID_ID and returns false.
  */
 bool status_any(enum status_class cls);
 
 /**
  * @brief Clear all bits in the given class.
  *
+ * @param cls  Status class to clear.
+ *
+ * @note Each bank is cleared by an individual atomic store; this is not a
+ *       single transaction against concurrent producers.
  * @note The last-set ID tracker for the class (e.g. status_last_fault()) is
- *       not modified; it preserves the audit trail of the most recently set
- *       ID. Call status_init() to reset all trackers.
+ *       preserved as an audit trail; call status_init() to reset all trackers.
+ * @note An unrecognised @p cls invokes the error callback with
+ *       STATUS_ERR_INVALID_ID and changes nothing.
  */
 void status_clear_all(enum status_class cls);
 
 /**
- * @brief Get the last status ID that was set.
+ * @brief Get the most recently set fault ID.
  *
- * Note:
- *     This value is updated automatically whenever any new fault is set using
- *     status_set_fault(). It reflects only the MOST RECENTLY SET fault,
- *     not all faults currently active. Use status_any(STATUS_CLASS_FAULT) to
- *     check if any faults exist at runtime.
+ * @return The last ID passed to status_set_fault(), or STATUS_UNSET_ID if no
+ *         fault has been set since the last status_init(). Reflects only the
+ *         most recently set fault, not all active faults; use
+ *         status_any(STATUS_CLASS_FAULT) to test for any active fault.
  */
 uint16_t status_last_fault(void);
 
 /**
- * @brief Get the last warning ID that was set.
+ * @brief Get the most recently set warning ID.
+ *
+ * @return The last ID passed to status_set_warning(), or STATUS_UNSET_ID if no
+ *         warning has been set since the last status_init().
  */
 uint16_t status_last_warning(void);
 
 /**
- * @brief Get the last info ID that was set.
+ * @brief Get the most recently set info ID.
+ *
+ * @return The last ID passed to status_set_info(), or STATUS_UNSET_ID if no
+ *         info bit has been set since the last status_init().
  */
 uint16_t status_last_info(void);
 
 /**
- * @brief Snapshot all status registers into a destination buffer.
+ * @brief Copy the banks of a class into a caller-supplied buffer.
  *
- * @param cls       The class of status.
- * @param dst       Destination array with space for at least `len` entries.
- * @param len       Number of bank entries to copy; capped at NUM_STATUS_BANKS.
+ * @param cls  Status class to snapshot.
+ * @param dst  Destination array with space for at least @p len entries.
+ * @param len  Number of banks to copy; capped at NUM_STATUS_BANKS. A value
+ *             below NUM_STATUS_BANKS produces a partial snapshot.
  *
+ * @note Each bank is read atomically, but the snapshot as a whole is not a
+ *       single instant of the class.
  * @note On error the callback is invoked and no copy is performed:
- *       - Invalid cls          → STATUS_ERR_INVALID_ID
- *       - NULL dst             → STATUS_ERR_NULL_PTR
- *       - len == 0             → STATUS_ERR_INVALID_LEN
+ *       - invalid @p cls  → STATUS_ERR_INVALID_ID
+ *       - NULL @p dst     → STATUS_ERR_NULL_PTR
+ *       - @p len == 0     → STATUS_ERR_INVALID_LEN
  */
 void status_snapshot(enum status_class cls, uint16_t *dst, size_t len);
 

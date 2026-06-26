@@ -46,15 +46,15 @@ _Static_assert(NUM_STATUS_BITS == 16u,
 
 /* ================ STATIC VARIABLES ======================================== */
 
-static volatile uint16_t fault_banks[NUM_STATUS_BANKS];
-static volatile uint16_t warning_banks[NUM_STATUS_BANKS];
-static volatile uint16_t info_banks[NUM_STATUS_BANKS];
+static STATUS_ATOMIC_QUAL uint16_t fault_banks[NUM_STATUS_BANKS];
+static STATUS_ATOMIC_QUAL uint16_t warning_banks[NUM_STATUS_BANKS];
+static STATUS_ATOMIC_QUAL uint16_t info_banks[NUM_STATUS_BANKS];
 
-static volatile uint16_t last_fault_id = STATUS_UNSET_ID;
-static volatile uint16_t last_warning_id = STATUS_UNSET_ID;
-static volatile uint16_t last_info_id = STATUS_UNSET_ID;
+static STATUS_ATOMIC_QUAL uint16_t last_fault_id = STATUS_UNSET_ID;
+static STATUS_ATOMIC_QUAL uint16_t last_warning_id = STATUS_UNSET_ID;
+static STATUS_ATOMIC_QUAL uint16_t last_info_id = STATUS_UNSET_ID;
 
-static volatile status_err_cb_t err_cb = NULL;
+static STATUS_ATOMIC_QUAL status_err_cb_t err_cb = NULL;
 
 /* ================ MACROS ================================================== */
 
@@ -67,10 +67,10 @@ size_min(size_t a, size_t b)
 }
 
 /* Writeable view */
-static inline volatile uint16_t *
+static inline STATUS_ATOMIC_QUAL uint16_t *
 get_banks_mut(enum status_class cls)
 {
-        volatile uint16_t *result;
+        STATUS_ATOMIC_QUAL uint16_t *result;
 
         switch (cls) {
         case STATUS_CLASS_FAULT: result = fault_banks; break;
@@ -83,26 +83,38 @@ get_banks_mut(enum status_class cls)
 }
 
 /* Read-only view */
-static inline const volatile uint16_t *
+static inline const STATUS_ATOMIC_QUAL uint16_t *
 get_banks_ro(enum status_class cls)
 {
         return get_banks_mut(cls); /* adds const qualifier */
+}
+
+/* Tracker for the last-set ID of a class, or NULL for an invalid class. */
+static inline STATUS_ATOMIC_QUAL uint16_t *
+get_last_id(enum status_class cls)
+{
+        STATUS_ATOMIC_QUAL uint16_t *result;
+
+        switch (cls) {
+        case STATUS_CLASS_FAULT: result = &last_fault_id; break;
+        case STATUS_CLASS_WARNING: result = &last_warning_id; break;
+        case STATUS_CLASS_INFO: result = &last_info_id; break;
+        default: result = NULL; break;
+        }
+
+        return result;
 }
 
 static void
 invoke_err_cb(status_err_t err, uint16_t id)
 {
         /*
-         * Snapshot the callback pointer under the critical section to avoid a
-         * data race with status_set_err_callback() on architectures or RTOS
-         * environments where pointer reads are not naturally atomic.  The
-         * actual invocation happens outside the critical section so that a
-         * callback that re-enters the status API (e.g. to set a secondary
-         * fault) does not deadlock.
+         * Load the callback pointer atomically to avoid a data race with
+         * status_set_err_callback(). The actual invocation happens on the
+         * loaded local so that a callback which re-enters the status API (e.g.
+         * to set a secondary fault) cannot observe a torn pointer.
          */
-        STATUS_ENTER_CRITICAL();
-        status_err_cb_t cb = err_cb;
-        STATUS_EXIT_CRITICAL();
+        status_err_cb_t cb = STATUS_ATOMIC_LOAD(&err_cb);
 
         if (cb != NULL) {
                 cb(err, id);
@@ -113,7 +125,7 @@ static void
 set_bit(uint16_t id, enum status_class cls)
 {
         uint16_t bank = status_bank(id);
-        volatile uint16_t *b = get_banks_mut(cls);
+        STATUS_ATOMIC_QUAL uint16_t *b = get_banks_mut(cls);
 
         if (bank >= NUM_STATUS_BANKS) {
                 invoke_err_cb(STATUS_ERR_INVALID_BANK, id);
@@ -121,16 +133,16 @@ set_bit(uint16_t id, enum status_class cls)
                 invoke_err_cb(STATUS_ERR_INVALID_ID, id);
         } else {
                 uint16_t bit = status_bit(id);
+                uint16_t mask = (uint16_t)((uint32_t)1u << (uint32_t)bit);
 
-                STATUS_ENTER_CRITICAL();
-                b[bank] = (uint16_t)(b[bank] | (uint16_t)((uint32_t)1u << (uint32_t)bit));
-                switch (cls) {
-                case STATUS_CLASS_FAULT: last_fault_id = id; break;
-                case STATUS_CLASS_WARNING: last_warning_id = id; break;
-                case STATUS_CLASS_INFO: last_info_id = id; break;
-                default: break;
-                }
-                STATUS_EXIT_CRITICAL();
+                STATUS_ATOMIC_OR(&b[bank], mask);
+                /*
+                 * The tracker store is a separate atomic op, so the bit and the
+                 * "last set" record are not updated as one transaction; the
+                 * tracker is a best-effort most-recent-wins audit hint.
+                 */
+                STATUS_ATOMIC_QUAL uint16_t *last = get_last_id(cls);
+                STATUS_ATOMIC_STORE(last, id);
         }
 }
 
@@ -138,7 +150,7 @@ static void
 clear_bit(uint16_t id, enum status_class cls)
 {
         uint16_t bank = status_bank(id);
-        volatile uint16_t *b = get_banks_mut(cls);
+        STATUS_ATOMIC_QUAL uint16_t *b = get_banks_mut(cls);
 
         if (bank >= NUM_STATUS_BANKS) {
                 invoke_err_cb(STATUS_ERR_INVALID_BANK, id);
@@ -146,10 +158,9 @@ clear_bit(uint16_t id, enum status_class cls)
                 invoke_err_cb(STATUS_ERR_INVALID_ID, id);
         } else {
                 uint16_t bit = status_bit(id);
+                uint16_t mask = (uint16_t)((uint32_t)1u << (uint32_t)bit);
 
-                STATUS_ENTER_CRITICAL();
-                b[bank] = (uint16_t)(b[bank] & (uint16_t)(0xFFFFu ^ (uint16_t)((uint32_t)1u << (uint32_t)bit)));
-                STATUS_EXIT_CRITICAL();
+                STATUS_ATOMIC_AND(&b[bank], (uint16_t)(0xFFFFu ^ mask));
         }
 }
 
@@ -157,7 +168,7 @@ static bool
 is_bit_set(uint16_t id, enum status_class cls)
 {
         uint16_t bank = status_bank(id);
-        const volatile uint16_t *b = get_banks_ro(cls);
+        const STATUS_ATOMIC_QUAL uint16_t *b = get_banks_ro(cls);
         bool result = false;
 
         if (bank >= NUM_STATUS_BANKS) {
@@ -166,11 +177,9 @@ is_bit_set(uint16_t id, enum status_class cls)
                 invoke_err_cb(STATUS_ERR_INVALID_ID, id);
         } else {
                 uint16_t bit = status_bit(id);
+                uint16_t mask = (uint16_t)((uint32_t)1u << (uint32_t)bit);
 
-                STATUS_ENTER_CRITICAL();
-                result =
-                    (b[bank] & (uint16_t)((uint32_t)1u << (uint32_t)bit)) != 0u;
-                STATUS_EXIT_CRITICAL();
+                result = (STATUS_ATOMIC_LOAD(&b[bank]) & mask) != 0u;
         }
 
         return result;
@@ -181,24 +190,25 @@ is_bit_set(uint16_t id, enum status_class cls)
 void
 status_init(void)
 {
-        STATUS_ENTER_CRITICAL();
+        /*
+         * Each store is individually atomic. status_init() is not itself a
+         * transaction; it is intended to run before any concurrent producer is
+         * active (e.g. at start-up or a coordinated re-init).
+         */
         for (size_t i = 0u; i < NUM_STATUS_BANKS; ++i) {
-                fault_banks[i] = 0u;
-                warning_banks[i] = 0u;
-                info_banks[i] = 0u;
+                STATUS_ATOMIC_STORE(&fault_banks[i], (uint16_t)0u);
+                STATUS_ATOMIC_STORE(&warning_banks[i], (uint16_t)0u);
+                STATUS_ATOMIC_STORE(&info_banks[i], (uint16_t)0u);
         }
-        last_fault_id = STATUS_UNSET_ID;
-        last_warning_id = STATUS_UNSET_ID;
-        last_info_id = STATUS_UNSET_ID;
-        STATUS_EXIT_CRITICAL();
+        STATUS_ATOMIC_STORE(&last_fault_id, (uint16_t)STATUS_UNSET_ID);
+        STATUS_ATOMIC_STORE(&last_warning_id, (uint16_t)STATUS_UNSET_ID);
+        STATUS_ATOMIC_STORE(&last_info_id, (uint16_t)STATUS_UNSET_ID);
 }
 
 void
 status_set_err_callback(status_err_cb_t cb)
 {
-        STATUS_ENTER_CRITICAL();
-        err_cb = cb;
-        STATUS_EXIT_CRITICAL();
+        STATUS_ATOMIC_STORE(&err_cb, cb);
 }
 
 void
@@ -258,19 +268,21 @@ status_is_info_set(uint16_t id)
 bool
 status_any(enum status_class cls)
 {
-        const volatile uint16_t *b = get_banks_ro(cls);
+        const STATUS_ATOMIC_QUAL uint16_t *b = get_banks_ro(cls);
         bool result = false;
 
         if (b == NULL) {
                 invoke_err_cb(STATUS_ERR_INVALID_ID, STATUS_UNSET_ID);
         } else {
-                STATUS_ENTER_CRITICAL();
+                /*
+                 * Each bank is read atomically, but the scan is not a single
+                 * consistent snapshot of the class (see the header note).
+                 */
                 for (size_t i = 0u; (i < NUM_STATUS_BANKS) && !result; ++i) {
-                        if (b[i] != 0u) {
+                        if (STATUS_ATOMIC_LOAD(&b[i]) != 0u) {
                                 result = true;
                         }
                 }
-                STATUS_EXIT_CRITICAL();
         }
 
         return result;
@@ -279,50 +291,39 @@ status_any(enum status_class cls)
 void
 status_clear_all(enum status_class cls)
 {
-        volatile uint16_t *b = get_banks_mut(cls);
+        STATUS_ATOMIC_QUAL uint16_t *b = get_banks_mut(cls);
 
         if (b == NULL) {
                 invoke_err_cb(STATUS_ERR_INVALID_ID, STATUS_UNSET_ID);
         } else {
-                STATUS_ENTER_CRITICAL();
                 for (size_t i = 0u; i < NUM_STATUS_BANKS; ++i) {
-                        b[i] = 0u;
+                        STATUS_ATOMIC_STORE(&b[i], (uint16_t)0u);
                 }
-                STATUS_EXIT_CRITICAL();
         }
 }
 
 uint16_t
 status_last_fault(void)
 {
-        STATUS_ENTER_CRITICAL();
-        uint16_t id = last_fault_id;
-        STATUS_EXIT_CRITICAL();
-        return id;
+        return STATUS_ATOMIC_LOAD(&last_fault_id);
 }
 
 uint16_t
 status_last_warning(void)
 {
-        STATUS_ENTER_CRITICAL();
-        uint16_t id = last_warning_id;
-        STATUS_EXIT_CRITICAL();
-        return id;
+        return STATUS_ATOMIC_LOAD(&last_warning_id);
 }
 
 uint16_t
 status_last_info(void)
 {
-        STATUS_ENTER_CRITICAL();
-        uint16_t id = last_info_id;
-        STATUS_EXIT_CRITICAL();
-        return id;
+        return STATUS_ATOMIC_LOAD(&last_info_id);
 }
 
 void
 status_snapshot(enum status_class cls, uint16_t *dst, size_t len)
 {
-        const volatile uint16_t *src = get_banks_ro(cls);
+        const STATUS_ATOMIC_QUAL uint16_t *src = get_banks_ro(cls);
 
         if (src == NULL) {
                 invoke_err_cb(STATUS_ERR_INVALID_ID, STATUS_UNSET_ID);
@@ -333,10 +334,12 @@ status_snapshot(enum status_class cls, uint16_t *dst, size_t len)
         } else {
                 const size_t copy_len = size_min(len, NUM_STATUS_BANKS);
 
-                STATUS_ENTER_CRITICAL();
+                /*
+                 * Bank-by-bank atomic copy. Each bank is coherent; the whole
+                 * snapshot is not a single instant of the class.
+                 */
                 for (size_t i = 0u; i < copy_len; ++i) {
-                        dst[i] = src[i];
+                        dst[i] = STATUS_ATOMIC_LOAD(&src[i]);
                 }
-                STATUS_EXIT_CRITICAL();
         }
 }

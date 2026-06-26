@@ -8,7 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Reworked the concurrency model: single-bit set/clear is now a lock-free atomic read-modify-write via an auto-discovered backend (`__atomic` → C11 `<stdatomic.h>` → uniprocessor fallback), mirroring `seqlock`. The mandatory `STATUS_ENTER_CRITICAL` / `STATUS_EXIT_CRITICAL` hooks and their unconditional `#warning` are gone; the hooks now apply only to the `STATUS_USE_NO_ATOMICS` fallback and default to silent no-ops. The atomic backends statically assert lock-free bank and callback-pointer storage so unsupported targets fail loudly. Backend selection and `NUM_STATUS_BANKS` moved to a new `status_conf.h`.
+- Documented MISRA C:2023 / IEC 61508 awareness in the public header, matching the primitive family baseline.
+- Hardened the public API contracts: every function now documents its parameters, return values, invalid-input behaviour, the error callback's execution context (may be an ISR) and reentrancy, and the relaxed memory-ordering limitation.
 - Standardised CI, security policy, contributor guidance, SPDX headers, coverage thresholds, ignore rules, README badge, and copyright metadata with the primitive family baseline.
+
+### Added
+
+- Concurrent lost-update test (`test_status_mt.c`) that races 16 distinct bits of a shared bank and fails if any atomic read-modify-write is lost; verified to fail against a non-atomic build and to be ThreadSanitizer-clean against the atomic backends.
+- Test suite now exercises all three backends (default, forced C11, forced no-atomics) and CI gains a dedicated ThreadSanitizer job.
 
 ## [1.2.4] - 2026-03-12
 

@@ -35,13 +35,13 @@ configure_file(
 
 public_headers = include_directories('include')
 
-install_headers('include/status.h', subdir: 'status')
+install_headers('include/status.h', 'include/status_conf.h', subdir: 'status')
 
 # ── Application core library ───────────────────────────────────────────────────
 # Hardware-agnostic application logic.  Linked by both the application
 # executable and the unit-test suite (which supplies its own platform mocks).
 
-library_sources = ['src/status.c']
+library_sources = files('src/status.c')
 
 status_lib = static_library(
   'status',

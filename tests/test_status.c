@@ -9,10 +9,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/* Provide no-op critical sections for host-side testing. */
-#define STATUS_ENTER_CRITICAL()
-#define STATUS_EXIT_CRITICAL()
-
+/*
+ * The host build auto-selects the GCC/Clang atomic backend, so set/clear are
+ * genuinely atomic and no critical-section hooks are required.
+ */
 #include "status.h"
 #include "status_ids.h"
 
@@ -569,8 +569,8 @@ test_snapshot_oversized_len(void)
         status_snapshot(STATUS_CLASS_FAULT, snap, NUM_STATUS_BANKS + 8u);
 
         TEST_ASSERT(g_err_count == 0u);
-        uint16_t expect = (uint16_t)((uint32_t)1u
-                          << (uint32_t)status_bit(STATUS_ID_FAULT_OVERCURRENT));
+        uint16_t expect = (uint16_t)((uint32_t)1u << (uint32_t)status_bit(
+                                         STATUS_ID_FAULT_OVERCURRENT));
         TEST_ASSERT((snap[0] & expect) == expect);
 
         TEST_PASS(__func__);
