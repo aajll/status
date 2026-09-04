@@ -23,14 +23,76 @@ err_b(status_err_t err, uint16_t id)
         ++err_count_b;
 }
 
+static void
+test_snapshot_enumeration(void)
+{
+        uint16_t snapshot[NUM_STATUS_BANKS];
+        uint16_t id = STATUS_UNSET_ID;
+        size_t cursor = 0u;
+
+        for (size_t i = 0u; i < NUM_STATUS_BANKS; ++i) {
+                snapshot[i] = 0u;
+        }
+        TEST_ASSERT(
+            !status_snapshot_next(snapshot, NUM_STATUS_BANKS, &cursor, &id));
+        TEST_ASSERT(
+            !status_snapshot_next(NULL, NUM_STATUS_BANKS, &cursor, &id));
+        TEST_ASSERT(
+            !status_snapshot_next(snapshot, NUM_STATUS_BANKS, NULL, &id));
+        TEST_ASSERT(
+            !status_snapshot_next(snapshot, NUM_STATUS_BANKS, &cursor, NULL));
+
+        snapshot[0] = 1u;
+        snapshot[3] = (uint16_t)((uint32_t)1u << 5u);
+        snapshot[NUM_STATUS_BANKS - 1u] = (uint16_t)((uint32_t)1u << 15u);
+        cursor = 0u;
+        TEST_ASSERT(
+            status_snapshot_next(snapshot, NUM_STATUS_BANKS, &cursor, &id));
+        TEST_ASSERT(id == STATUS_ENCODE(0u, 0u));
+        TEST_ASSERT(
+            status_snapshot_next(snapshot, NUM_STATUS_BANKS, &cursor, &id));
+        TEST_ASSERT(id == STATUS_ENCODE(3u, 5u));
+        TEST_ASSERT(
+            status_snapshot_next(snapshot, NUM_STATUS_BANKS, &cursor, &id));
+        TEST_ASSERT(id == STATUS_ENCODE(NUM_STATUS_BANKS - 1u, 15u));
+        TEST_ASSERT(
+            !status_snapshot_next(snapshot, NUM_STATUS_BANKS, &cursor, &id));
+
+        for (size_t i = 0u; i < NUM_STATUS_BANKS; ++i) {
+                snapshot[i] = 0xFFFFu;
+        }
+        cursor = 0u;
+        for (size_t bit = 0u; bit < NUM_STATUS_BANKS * NUM_STATUS_BITS; ++bit) {
+                TEST_ASSERT(status_snapshot_next(snapshot, NUM_STATUS_BANKS,
+                                                 &cursor, &id));
+                TEST_ASSERT(id
+                            == STATUS_ENCODE(bit / NUM_STATUS_BITS,
+                                             bit % NUM_STATUS_BITS));
+        }
+        TEST_ASSERT(
+            !status_snapshot_next(snapshot, NUM_STATUS_BANKS, &cursor, &id));
+
+        for (size_t i = 0u; i < NUM_STATUS_BANKS; ++i) {
+                snapshot[i] = 0u;
+        }
+        snapshot[2] = 1u;
+        cursor = 0u;
+        TEST_ASSERT(!status_snapshot_next(snapshot, 2u, &cursor, &id));
+
+        snapshot[2] = 0u;
+        snapshot[NUM_STATUS_BANKS - 1u] = (uint16_t)((uint32_t)1u << 15u);
+        cursor = 0u;
+        TEST_ASSERT(status_snapshot_next(snapshot, NUM_STATUS_BANKS + 8u,
+                                         &cursor, &id));
+        TEST_ASSERT(id == STATUS_ENCODE(NUM_STATUS_BANKS - 1u, 15u));
+}
+
 int
 main(void)
 {
         status_reg_t a;
         status_reg_t b;
         uint16_t snapshot[NUM_STATUS_BANKS];
-        size_t cursor = 0u;
-        uint16_t scanned_id;
         const uint16_t fault = STATUS_ENCODE(0u, 0u);
         const uint16_t warning = STATUS_ENCODE(1u, 1u);
         const uint16_t info = STATUS_ENCODE(2u, 2u);
@@ -55,13 +117,6 @@ main(void)
 
         status_reg_snapshot(&a, STATUS_CLASS_FAULT, snapshot, NUM_STATUS_BANKS);
         TEST_ASSERT((snapshot[0] & 1u) != 0u);
-        TEST_ASSERT(status_snapshot_next(snapshot, NUM_STATUS_BANKS, &cursor,
-                                         &scanned_id));
-        TEST_ASSERT(scanned_id == fault);
-        TEST_ASSERT(!status_snapshot_next(snapshot, NUM_STATUS_BANKS, &cursor,
-                                          &scanned_id));
-        TEST_ASSERT(!status_snapshot_next(NULL, NUM_STATUS_BANKS, &cursor,
-                                          &scanned_id));
         status_reg_clear_fault(&a, fault);
         status_reg_clear_warning(&a, warning);
         status_reg_clear_info(&a, info);
@@ -115,6 +170,8 @@ main(void)
         TEST_ASSERT(status_reg_last_fault(NULL) == STATUS_UNSET_ID);
         TEST_ASSERT(status_reg_last_warning(NULL) == STATUS_UNSET_ID);
         TEST_ASSERT(status_reg_last_info(NULL) == STATUS_UNSET_ID);
+
+        test_snapshot_enumeration();
 
         TEST_PASS(__FILE__);
         return EXIT_SUCCESS;
