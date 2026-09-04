@@ -89,16 +89,45 @@ get_banks_ro(enum status_class cls)
         return get_banks_mut(cls); /* adds const qualifier */
 }
 
+static status_err_cb_t
+load_err_cb(void)
+{
+#if defined(STATUS_USE_NO_ATOMICS)
+        status_err_cb_t cb;
+
+        /* A function pointer may exceed the target's atomic access width. */
+        STATUS_ENTER_CRITICAL();
+        cb = err_cb;
+        STATUS_EXIT_CRITICAL();
+
+        return cb;
+#else
+        return STATUS_ATOMIC_LOAD(&err_cb);
+#endif
+}
+
+static void
+store_err_cb(status_err_cb_t cb)
+{
+#if defined(STATUS_USE_NO_ATOMICS)
+        /* A function pointer may exceed the target's atomic access width. */
+        STATUS_ENTER_CRITICAL();
+        err_cb = cb;
+        STATUS_EXIT_CRITICAL();
+#else
+        STATUS_ATOMIC_STORE(&err_cb, cb);
+#endif
+}
+
 static void
 invoke_err_cb(status_err_t err, uint16_t id)
 {
         /*
-         * Load the callback pointer atomically to avoid a data race with
-         * status_set_err_callback(). The actual invocation happens on the
-         * loaded local so that a callback which re-enters the status API (e.g.
-         * to set a secondary fault) cannot observe a torn pointer.
+         * The callback pointer is loaded with the backend's concurrency
+         * protection, but invocation happens after that protection ends. A
+         * callback may therefore safely re-enter the status API.
          */
-        status_err_cb_t cb = STATUS_ATOMIC_LOAD(&err_cb);
+        status_err_cb_t cb = load_err_cb();
 
         if (cb != NULL) {
                 cb(err, id);
@@ -191,7 +220,7 @@ status_init(void)
 void
 status_set_err_callback(status_err_cb_t cb)
 {
-        STATUS_ATOMIC_STORE(&err_cb, cb);
+        store_err_cb(cb);
 }
 
 void
