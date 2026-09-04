@@ -46,6 +46,22 @@
 #define SHARED_BANK     0u
 #define FULL_MASK       0xFFFFu
 
+#if defined(STATUS_TEST_INSTANCE)
+static status_reg_t shared_reg;
+#define STATUS_INIT()          status_reg_init(&shared_reg)
+#define STATUS_SET_FAULT(id)   status_reg_set_fault(&shared_reg, (id))
+#define STATUS_CLEAR_FAULT(id) status_reg_clear_fault(&shared_reg, (id))
+#define STATUS_SNAPSHOT(cls, dst, len)                                         \
+        status_reg_snapshot(&shared_reg, (cls), (dst), (len))
+#define STATUS_ANY(cls) status_reg_any(&shared_reg, (cls))
+#else
+#define STATUS_INIT()                  status_init()
+#define STATUS_SET_FAULT(id)           status_set_fault(id)
+#define STATUS_CLEAR_FAULT(id)         status_clear_fault(id)
+#define STATUS_SNAPSHOT(cls, dst, len) status_snapshot((cls), (dst), (len))
+#define STATUS_ANY(cls)                status_any(cls)
+#endif
+
 /* Scaled down under sanitizers (see status_test.h); overridable via -D. */
 #ifndef MT_ROUNDS
 #if STATUS_TEST_SANITIZED
@@ -108,12 +124,12 @@ bit_worker(void *arg)
         unsigned long long ops = 0ull;
 
         for (unsigned int r = 0u; r < MT_ROUNDS; ++r) {
-                status_set_fault(id_a); /* phase 1: race the OR */
-                status_set_fault(id_b);
+                STATUS_SET_FAULT(id_a); /* phase 1: race the OR */
+                STATUS_SET_FAULT(id_b);
                 barrier_wait(&g_barrier);
                 barrier_wait(&g_barrier); /* coordinator checks FULL */
-                status_clear_fault(id_a); /* phase 3: race the AND */
-                status_clear_fault(id_b);
+                STATUS_CLEAR_FAULT(id_a); /* phase 3: race the AND */
+                STATUS_CLEAR_FAULT(id_b);
                 barrier_wait(&g_barrier);
                 barrier_wait(&g_barrier); /* coordinator checks ZERO */
                 ops += 2ull;
@@ -129,7 +145,7 @@ read_shared_bank(void)
 {
         uint16_t snap[NUM_STATUS_BANKS];
 
-        status_snapshot(STATUS_CLASS_FAULT, snap, NUM_STATUS_BANKS);
+        STATUS_SNAPSHOT(STATUS_CLASS_FAULT, snap, NUM_STATUS_BANKS);
         return snap[SHARED_BANK];
 }
 
@@ -141,7 +157,7 @@ main(void)
         (void)fprintf(stdout,
                       "\n=== status concurrent lost-update test ===\n\n");
 
-        status_init();
+        STATUS_INIT();
         barrier_init(&g_barrier, (unsigned int)NUM_BIT_THREADS + 1u);
         atomic_store_explicit(&g_worker_ops, 0ull, memory_order_relaxed);
 
@@ -168,7 +184,7 @@ main(void)
         /* Liveness: every worker completed every round. */
         TEST_ASSERT(atomic_load_explicit(&g_worker_ops, memory_order_relaxed)
                     == (unsigned long long)NUM_BIT_THREADS * MT_ROUNDS * 2ull);
-        TEST_ASSERT(status_any(STATUS_CLASS_FAULT) == false);
+        TEST_ASSERT(STATUS_ANY(STATUS_CLASS_FAULT) == false);
 
         (void)fprintf(
             stdout, "rounds=%u  worker ops=%llu (no lost updates)\n",

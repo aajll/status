@@ -121,6 +121,23 @@ typedef enum {
  */
 typedef void (*status_err_cb_t)(status_err_t err, uint16_t id);
 
+/**
+ * @brief Caller-owned status register storage.
+ *
+ * @details Allocate this type statically or automatically, then initialise it
+ * with status_reg_init(). Its members are implementation-owned: do not inspect,
+ * modify, or copy a register while it is active.
+ */
+typedef struct {
+        STATUS_ATOMIC_QUAL uint16_t fault_banks[NUM_STATUS_BANKS];
+        STATUS_ATOMIC_QUAL uint16_t warning_banks[NUM_STATUS_BANKS];
+        STATUS_ATOMIC_QUAL uint16_t info_banks[NUM_STATUS_BANKS];
+        STATUS_ATOMIC_QUAL uint16_t last_fault_id;
+        STATUS_ATOMIC_QUAL uint16_t last_warning_id;
+        STATUS_ATOMIC_QUAL uint16_t last_info_id;
+        STATUS_ATOMIC_QUAL status_err_cb_t err_cb;
+} status_reg_t;
+
 /* ================ COMPILE-TIME GUARANTEES ================================= */
 
 /*
@@ -215,6 +232,38 @@ status_bit(uint16_t id)
 {
         return (uint16_t)(id & 0x0Fu);
 }
+
+/*
+ * Caller-owned register interface.
+ *
+ * Initialise raw storage with status_reg_init() before use, at start-up or a
+ * coordinated quiesce only. It clears banks and trackers and deregisters its
+ * callback. Per-bit set/clear/query has the singleton concurrency contract;
+ * init, clear-all, scans, and snapshots are bank-by-bank, not transactions.
+ *
+ * A NULL register is a no-op for mutators and snapshots, returns false for
+ * predicates, and returns STATUS_UNSET_ID for last-ID getters. It cannot report
+ * an error because it has no instance callback. The callback is instance-local,
+ * runs synchronously outside internal protection, and may re-enter this API.
+ */
+void status_reg_init(status_reg_t *reg);
+void status_reg_set_err_callback(status_reg_t *reg, status_err_cb_t cb);
+void status_reg_set_warning(status_reg_t *reg, uint16_t id);
+void status_reg_set_fault(status_reg_t *reg, uint16_t id);
+void status_reg_set_info(status_reg_t *reg, uint16_t id);
+void status_reg_clear_warning(status_reg_t *reg, uint16_t id);
+void status_reg_clear_fault(status_reg_t *reg, uint16_t id);
+void status_reg_clear_info(status_reg_t *reg, uint16_t id);
+bool status_reg_is_warning_set(const status_reg_t *reg, uint16_t id);
+bool status_reg_is_fault_set(const status_reg_t *reg, uint16_t id);
+bool status_reg_is_info_set(const status_reg_t *reg, uint16_t id);
+bool status_reg_any(const status_reg_t *reg, enum status_class cls);
+void status_reg_clear_all(status_reg_t *reg, enum status_class cls);
+uint16_t status_reg_last_fault(const status_reg_t *reg);
+uint16_t status_reg_last_warning(const status_reg_t *reg);
+uint16_t status_reg_last_info(const status_reg_t *reg);
+void status_reg_snapshot(const status_reg_t *reg, enum status_class cls,
+                         uint16_t *dst, size_t len);
 
 /*
  * Error model (applies to every public function below): no function ever

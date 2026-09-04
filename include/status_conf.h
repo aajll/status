@@ -110,7 +110,8 @@
 
 /** Qualifier applied to bank and tracker storage (none needed for __atomic). */
 #define STATUS_ATOMIC_QUAL
-#define STATUS_ATOMIC_LOAD(ptr) __atomic_load_n((ptr), __ATOMIC_RELAXED)
+#define STATUS_ATOMIC_INIT(ptr, val) ((void)(*(ptr) = (val)))
+#define STATUS_ATOMIC_LOAD(ptr)      __atomic_load_n((ptr), __ATOMIC_RELAXED)
 #define STATUS_ATOMIC_STORE(ptr, val)                                          \
         __atomic_store_n((ptr), (val), __ATOMIC_RELAXED)
 #define STATUS_ATOMIC_OR(ptr, val)                                             \
@@ -121,7 +122,8 @@
 #elif defined(STATUS_USE_C11_ATOMICS)
 
 #include <stdatomic.h>
-#define STATUS_ATOMIC_QUAL _Atomic
+#define STATUS_ATOMIC_QUAL           _Atomic
+#define STATUS_ATOMIC_INIT(ptr, val) atomic_init((ptr), (val))
 #define STATUS_ATOMIC_LOAD(ptr)                                                \
         atomic_load_explicit((ptr), memory_order_relaxed)
 #define STATUS_ATOMIC_STORE(ptr, val)                                          \
@@ -172,6 +174,7 @@
 #endif
 
 #define STATUS_ATOMIC_QUAL            volatile
+#define STATUS_ATOMIC_INIT(ptr, val)  ((void)(*(ptr) = (val)))
 #define STATUS_ATOMIC_LOAD(ptr)       (*(ptr))
 #define STATUS_ATOMIC_STORE(ptr, val) ((void)(*(ptr) = (val)))
 #define STATUS_ATOMIC_OR(ptr, val)                                             \

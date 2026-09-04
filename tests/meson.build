@@ -21,6 +21,14 @@ test_mt_exe = executable(
 )
 test('status concurrency', test_mt_exe, timeout: 120)
 
+test_reg_mt_exe = executable(
+  'test_status_reg_mt',
+  ['test_status_mt.c'],
+  dependencies: [status_dep, thread_dep],
+  c_args: ['-DSTATUS_TEST_INSTANCE=1', '-Werror'],
+)
+test('status register concurrency', test_reg_mt_exe, timeout: 120)
+
 # Forced C11 <stdatomic.h> backend. The default on GCC/Clang is the __atomic
 # path, so this rebuilds the library sources with the -D for both the suite and
 # the core to exercise that backend and its lock-free static assertion.
@@ -68,3 +76,28 @@ test_copy_in_exe = executable(
   include_directories: public_headers,
 )
 test('status copy-in configuration', test_copy_in_exe)
+
+# Caller-owned register interface across every supported backend.
+test_reg_exe = executable(
+  'test_status_reg',
+  ['test_status_reg.c'],
+  dependencies: [status_dep],
+  c_args: ['-Werror'],
+)
+test('status register', test_reg_exe)
+
+test_reg_c11_exe = executable(
+  'test_status_reg_c11',
+  ['test_status_reg.c'] + library_sources,
+  c_args: ['-DSTATUS_USE_C11_ATOMICS=1', '-Werror'],
+  include_directories: public_headers,
+)
+test('status register c11 backend', test_reg_c11_exe)
+
+test_reg_no_atomics_exe = executable(
+  'test_status_reg_no_atomics',
+  ['test_status_reg.c'] + library_sources,
+  c_args: ['-DSTATUS_USE_NO_ATOMICS=1', '-Werror'],
+  include_directories: public_headers,
+)
+test('status register no-atomics backend', test_reg_no_atomics_exe)

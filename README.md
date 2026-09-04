@@ -93,6 +93,27 @@ void check_system(void)
 }
 ```
 
+### Caller-owned registers
+
+Use `status_reg_t` when subsystems need independent status spaces. Initialise
+storage before concurrent use; the existing `status_*` functions continue to
+use the library's default register.
+
+```c
+static status_reg_t motor_status;
+
+void motor_init(void)
+{
+    status_reg_init(&motor_status);
+    status_reg_set_err_callback(&motor_status, my_error_handler);
+}
+
+void motor_check(void)
+{
+    status_reg_set_fault(&motor_status, STATUS_ID_FAULT_OVERCURRENT);
+}
+```
+
 ## Configuration
 
 Override options with compiler definitions passed consistently when compiling
