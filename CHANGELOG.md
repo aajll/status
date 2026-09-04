@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-04
+
+### Added
+
+- Caller-owned `status_reg_t` registers with independent banks, trackers, and error callbacks. The existing singleton interface remains available as compatibility wrappers.
+- Atomic per-bit test-and-clear operations for singleton and caller-owned registers.
+- Deterministic enumeration of active IDs from caller-owned snapshots.
+
+### Fixed
+
+- Protected error-callback pointer access with critical-section hooks on the no-atomics backend.
+- Corrected copy-in installation and compile-time configuration guidance, with a consumer smoke test.
+
+### Changed
+
+- Documented active and latched fault composition using independent registers.
+- Added development guidance for visible invalid-input handling without changing nonfatal production defaults.
+
 ## [1.3.0] - 2026-06-26
 
 ### Changed
