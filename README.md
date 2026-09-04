@@ -164,6 +164,12 @@ Override options with compiler definitions passed consistently when compiling
 | `STATUS_USE_GNU_ATOMICS` / `STATUS_USE_C11_ATOMICS` / `STATUS_USE_NO_ATOMICS` | Force the atomic backend instead of auto-discovery                                | auto    |
 | `STATUS_ENTER_CRITICAL()` / `STATUS_EXIT_CRITICAL()`                          | Critical-section hooks, consulted **only** on the `STATUS_USE_NO_ATOMICS` backend | no-op   |
 
+## Development error handling
+
+Invalid input is a no-op when no error callback is registered. During development and testing, register a loud application callback so a bad ID, class, pointer, or length fails visibly. The handler can log, assert, or stop the test according to the target's policy.
+
+Keep the handler safe for every calling context. It can run synchronously from an ISR, so do not block or call an ISR-unsafe logger there. Production can replace it with a nonfatal diagnostic handler or deregister it with `status_set_err_callback(NULL)`.
+
 ## Concurrency
 
 Setting or clearing a single status bit is a genuine atomic read-modify-write on the bank word, so one context may set a bit while another clears a different bit in the same bank without either update being lost. On the two hardware-backed backends this is interrupt- and core-safe by construction, and **no caller-supplied critical section is required** for per-bit operations.
