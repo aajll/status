@@ -134,12 +134,14 @@
 #else /* STATUS_USE_NO_ATOMICS */
 
 /*
- * Degenerate uniprocessor fallback. A `volatile` aligned 16-bit load or store
- * is a single indivisible access on the targets this path serves, so LOAD and
- * STORE need no guard. The OR/AND read-modify-write is NOT indivisible, so it
- * is wrapped in the caller's critical section to stay interrupt-safe; with the
- * default no-op hooks it is correct only when set/clear cannot preempt one
- * another.
+ * Degenerate uniprocessor fallback. A `volatile` aligned 16-bit bank or
+ * tracker load/store is a single indivisible access on the targets this path
+ * serves, so LOAD and STORE need no guard. The OR/AND read-modify-write is NOT
+ * indivisible, so it is wrapped in the caller's critical section to stay
+ * interrupt-safe. Callback pointers can be wider, so status.c also wraps their
+ * load/store with these hooks and invokes callbacks after leaving the section.
+ * With the default no-op hooks this backend is correct only when no context can
+ * preempt a set/clear or callback-pointer access.
  */
 
 /*
