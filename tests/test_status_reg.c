@@ -70,6 +70,15 @@ main(void)
         TEST_ASSERT(!status_reg_is_info_set(&a, info));
 
         status_reg_set_fault(&a, fault);
+        TEST_ASSERT(status_reg_test_and_clear_fault(&a, fault));
+        TEST_ASSERT(!status_reg_test_and_clear_fault(&a, fault));
+        TEST_ASSERT(status_reg_last_fault(&a) == fault);
+        status_reg_set_warning(&a, warning);
+        status_reg_set_info(&a, info);
+        TEST_ASSERT(status_reg_test_and_clear_warning(&a, warning));
+        TEST_ASSERT(status_reg_test_and_clear_info(&a, info));
+
+        status_reg_set_fault(&a, fault);
         status_reg_clear_all(&a, STATUS_CLASS_FAULT);
         TEST_ASSERT(!status_reg_any(&a, STATUS_CLASS_FAULT));
 
@@ -94,6 +103,9 @@ main(void)
         status_reg_clear_warning(NULL, warning);
         status_reg_clear_info(NULL, info);
         status_reg_clear_all(NULL, STATUS_CLASS_FAULT);
+        TEST_ASSERT(!status_reg_test_and_clear_fault(NULL, fault));
+        TEST_ASSERT(!status_reg_test_and_clear_warning(NULL, warning));
+        TEST_ASSERT(!status_reg_test_and_clear_info(NULL, info));
         status_reg_snapshot(NULL, STATUS_CLASS_FAULT, snapshot,
                             NUM_STATUS_BANKS);
         TEST_ASSERT(!status_reg_is_fault_set(NULL, fault));

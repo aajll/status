@@ -183,7 +183,14 @@ void status_set_info(uint16_t id);
 void status_clear_fault(uint16_t id);
 void status_clear_warning(uint16_t id);
 void status_clear_info(uint16_t id);
+
+bool status_test_and_clear_fault(uint16_t id);
+bool status_test_and_clear_warning(uint16_t id);
+bool status_test_and_clear_info(uint16_t id);
 ```
+
+Test-and-clear returns the previous bit state and clears it at one atomic point.
+Repeated sets before consumption coalesce; this is not an event counter.
 
 ### Query
 
