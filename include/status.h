@@ -291,6 +291,9 @@ void status_reg_set_info(status_reg_t *reg, uint16_t id);
 void status_reg_clear_warning(status_reg_t *reg, uint16_t id);
 void status_reg_clear_fault(status_reg_t *reg, uint16_t id);
 void status_reg_clear_info(status_reg_t *reg, uint16_t id);
+bool status_reg_test_and_clear_warning(status_reg_t *reg, uint16_t id);
+bool status_reg_test_and_clear_fault(status_reg_t *reg, uint16_t id);
+bool status_reg_test_and_clear_info(status_reg_t *reg, uint16_t id);
 bool status_reg_is_warning_set(const status_reg_t *reg, uint16_t id);
 bool status_reg_is_fault_set(const status_reg_t *reg, uint16_t id);
 bool status_reg_is_info_set(const status_reg_t *reg, uint16_t id);
@@ -410,6 +413,22 @@ void status_clear_fault(uint16_t id);
  *       invokes the error callback with STATUS_ERR_INVALID_BANK.
  */
 void status_clear_info(uint16_t id);
+
+/**
+ * @brief Atomically test and clear one status bit.
+ *
+ * @param id  Status ID from STATUS_ENCODE(); its bank must be
+ *            < NUM_STATUS_BANKS.
+ * @return true if the bit was set before this call cleared it; false if it was
+ *         already clear or @p id is invalid.
+ *
+ * @note Each operation has one atomic linearization point. Repeated sets before
+ *       consumption coalesce into one true result; this is not an event
+ *       counter. Last-set trackers are not modified.
+ */
+bool status_test_and_clear_warning(uint16_t id);
+bool status_test_and_clear_fault(uint16_t id);
+bool status_test_and_clear_info(uint16_t id);
 
 /**
  * @brief Check whether a given warning status bit is set.

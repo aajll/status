@@ -645,6 +645,31 @@ test_null_callback_deregisters(void)
  * overwrites the tracker (most-recent-wins).
  */
 static void
+test_atomic_test_and_clear(void)
+{
+        setUp();
+
+        status_set_fault(STATUS_ID_FAULT_OVERCURRENT);
+        status_set_warning(STATUS_ID_WARN_TEMP_NEAR_LIMIT);
+        status_set_info(STATUS_ID_INFO_AC_LIVE);
+
+        TEST_ASSERT(status_test_and_clear_fault(STATUS_ID_FAULT_OVERCURRENT));
+        TEST_ASSERT(!status_test_and_clear_fault(STATUS_ID_FAULT_OVERCURRENT));
+        TEST_ASSERT(
+            status_test_and_clear_warning(STATUS_ID_WARN_TEMP_NEAR_LIMIT));
+        TEST_ASSERT(status_test_and_clear_info(STATUS_ID_INFO_AC_LIVE));
+        TEST_ASSERT(status_last_fault() == STATUS_ID_FAULT_OVERCURRENT);
+
+        reset_err_state();
+        TEST_ASSERT(
+            !status_test_and_clear_fault(STATUS_ENCODE(NUM_STATUS_BANKS, 0u)));
+        TEST_ASSERT(g_err_count == 1u);
+        TEST_ASSERT(g_last_err == STATUS_ERR_INVALID_BANK);
+
+        TEST_PASS(__func__);
+}
+
+static void
 test_last_id_most_recent_wins(void)
 {
         setUp();
@@ -703,6 +728,7 @@ main(void)
         test_clear_all_preserves_last_id();
         test_clear_fault_preserves_last_id();
         test_null_callback_deregisters();
+        test_atomic_test_and_clear();
         test_last_id_most_recent_wins();
 
         fprintf(stdout, "\nAll tests passed.\n");

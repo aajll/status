@@ -118,6 +118,8 @@
         ((void)__atomic_fetch_or((ptr), (val), __ATOMIC_RELAXED))
 #define STATUS_ATOMIC_AND(ptr, val)                                            \
         ((void)__atomic_fetch_and((ptr), (val), __ATOMIC_RELAXED))
+#define STATUS_ATOMIC_FETCH_AND(ptr, val, old)                                 \
+        ((void)((old) = __atomic_fetch_and((ptr), (val), __ATOMIC_RELAXED)))
 
 #elif defined(STATUS_USE_C11_ATOMICS)
 
@@ -132,6 +134,9 @@
         ((void)atomic_fetch_or_explicit((ptr), (val), memory_order_relaxed))
 #define STATUS_ATOMIC_AND(ptr, val)                                            \
         ((void)atomic_fetch_and_explicit((ptr), (val), memory_order_relaxed))
+#define STATUS_ATOMIC_FETCH_AND(ptr, val, old)                                 \
+        ((void)((old) = atomic_fetch_and_explicit((ptr), (val),                \
+                                                  memory_order_relaxed)))
 
 #else /* STATUS_USE_NO_ATOMICS */
 
@@ -187,6 +192,14 @@
         do {                                                                   \
                 STATUS_ENTER_CRITICAL();                                       \
                 *(ptr) = (uint16_t)(*(ptr) & (uint16_t)(val));                 \
+                STATUS_EXIT_CRITICAL();                                        \
+        } while (0)
+/* Arguments must be side-effect-free lvalues; ptr and old are reused. */
+#define STATUS_ATOMIC_FETCH_AND(ptr, val, old)                                 \
+        do {                                                                   \
+                STATUS_ENTER_CRITICAL();                                       \
+                (old) = *(ptr);                                                \
+                *(ptr) = (uint16_t)((old) & (uint16_t)(val));                  \
                 STATUS_EXIT_CRITICAL();                                        \
         } while (0)
 

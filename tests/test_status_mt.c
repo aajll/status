@@ -51,15 +51,18 @@ static status_reg_t shared_reg;
 #define STATUS_INIT()          status_reg_init(&shared_reg)
 #define STATUS_SET_FAULT(id)   status_reg_set_fault(&shared_reg, (id))
 #define STATUS_CLEAR_FAULT(id) status_reg_clear_fault(&shared_reg, (id))
+#define STATUS_TEST_AND_CLEAR_FAULT(id)                                        \
+        status_reg_test_and_clear_fault(&shared_reg, (id))
 #define STATUS_SNAPSHOT(cls, dst, len)                                         \
         status_reg_snapshot(&shared_reg, (cls), (dst), (len))
 #define STATUS_ANY(cls) status_reg_any(&shared_reg, (cls))
 #else
-#define STATUS_INIT()                  status_init()
-#define STATUS_SET_FAULT(id)           status_set_fault(id)
-#define STATUS_CLEAR_FAULT(id)         status_clear_fault(id)
-#define STATUS_SNAPSHOT(cls, dst, len) status_snapshot((cls), (dst), (len))
-#define STATUS_ANY(cls)                status_any(cls)
+#define STATUS_INIT()                   status_init()
+#define STATUS_SET_FAULT(id)            status_set_fault(id)
+#define STATUS_CLEAR_FAULT(id)          status_clear_fault(id)
+#define STATUS_TEST_AND_CLEAR_FAULT(id) status_test_and_clear_fault(id)
+#define STATUS_SNAPSHOT(cls, dst, len)  status_snapshot((cls), (dst), (len))
+#define STATUS_ANY(cls)                 status_any(cls)
 #endif
 
 /* Scaled down under sanitizers (see status_test.h); overridable via -D. */
@@ -114,6 +117,7 @@ barrier_wait(barrier_t *b)
 
 static barrier_t g_barrier;
 static atomic_ullong g_worker_ops;
+static atomic_uint g_clear_winners;
 
 static void *
 bit_worker(void *arg)
@@ -137,6 +141,20 @@ bit_worker(void *arg)
 
         (void)atomic_fetch_add_explicit(&g_worker_ops, ops,
                                         memory_order_relaxed);
+        return NULL;
+}
+
+static void *
+test_and_clear_worker(void *arg)
+{
+        (void)arg;
+
+        barrier_wait(&g_barrier);
+        if (STATUS_TEST_AND_CLEAR_FAULT(STATUS_ENCODE(SHARED_BANK, 0u))) {
+                (void)atomic_fetch_add_explicit(&g_clear_winners, 1u,
+                                                memory_order_relaxed);
+        }
+        barrier_wait(&g_barrier);
         return NULL;
 }
 
@@ -185,6 +203,30 @@ main(void)
         TEST_ASSERT(atomic_load_explicit(&g_worker_ops, memory_order_relaxed)
                     == (unsigned long long)NUM_BIT_THREADS * MT_ROUNDS * 2ull);
         TEST_ASSERT(STATUS_ANY(STATUS_CLASS_FAULT) == false);
+
+        {
+                pthread_t consumers[2];
+                const uint16_t id = STATUS_ENCODE(SHARED_BANK, 0u);
+
+                STATUS_SET_FAULT(id);
+                barrier_init(&g_barrier, 3u);
+                atomic_store_explicit(&g_clear_winners, 0u,
+                                      memory_order_relaxed);
+                for (size_t i = 0u; i < 2u; ++i) {
+                        TEST_ASSERT(pthread_create(&consumers[i], NULL,
+                                                   test_and_clear_worker, NULL)
+                                    == 0);
+                }
+                barrier_wait(&g_barrier);
+                barrier_wait(&g_barrier);
+                for (size_t i = 0u; i < 2u; ++i) {
+                        TEST_ASSERT(pthread_join(consumers[i], NULL) == 0);
+                }
+                TEST_ASSERT(
+                    atomic_load_explicit(&g_clear_winners, memory_order_relaxed)
+                    == 1u);
+                TEST_ASSERT(!STATUS_ANY(STATUS_CLASS_FAULT));
+        }
 
         (void)fprintf(
             stdout, "rounds=%u  worker ops=%llu (no lost updates)\n",
