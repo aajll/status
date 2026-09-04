@@ -263,7 +263,8 @@ status_snapshot_next(const uint16_t *snapshot, size_t len, size_t *cursor,
                 if ((snapshot[bit / NUM_STATUS_BITS]
                      & (uint16_t)((uint32_t)1u << (bit % NUM_STATUS_BITS)))
                     != 0u) {
-                        *id = (uint16_t)bit;
+                        *id = STATUS_ENCODE(bit / NUM_STATUS_BITS,
+                                            bit % NUM_STATUS_BITS);
                         return true;
                 }
         }
