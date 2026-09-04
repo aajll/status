@@ -233,6 +233,43 @@ status_bit(uint16_t id)
         return (uint16_t)(id & 0x0Fu);
 }
 
+/**
+ * @brief Return the next active ID from a caller-owned snapshot.
+ *
+ * @param snapshot  Bank array previously populated by status_snapshot().
+ * @param len       Number of banks in @p snapshot; capped at NUM_STATUS_BANKS.
+ * @param cursor    Bit offset; initialise to zero and preserve between calls.
+ * @param id        Destination for the next active ID.
+ * @return true when an ID was returned; false for invalid arguments or end.
+ *
+ * @note This scans only the supplied buffer, so traversal is deterministic and
+ *       never observes concurrent updates to a live register.
+ */
+static inline bool
+status_snapshot_next(const uint16_t *snapshot, size_t len, size_t *cursor,
+                     uint16_t *id)
+{
+        const size_t bit_count =
+            ((len < NUM_STATUS_BANKS) ? len : NUM_STATUS_BANKS)
+            * NUM_STATUS_BITS;
+
+        if ((snapshot == NULL) || (cursor == NULL) || (id == NULL)) {
+                return false;
+        }
+        while (*cursor < bit_count) {
+                const size_t bit = *cursor;
+
+                ++(*cursor);
+                if ((snapshot[bit / NUM_STATUS_BITS]
+                     & (uint16_t)((uint32_t)1u << (bit % NUM_STATUS_BITS)))
+                    != 0u) {
+                        *id = (uint16_t)bit;
+                        return true;
+                }
+        }
+        return false;
+}
+
 /*
  * Caller-owned register interface.
  *
