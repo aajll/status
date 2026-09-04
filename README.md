@@ -114,6 +114,44 @@ void motor_check(void)
 }
 ```
 
+### Compose active and latched faults
+
+An active fault means "true now". A latched fault means "occurred since the last acknowledgement". Keep these policies outside the primitive by using two caller-owned registers.
+
+```c
+static status_reg_t active;
+static status_reg_t latched;
+
+void fault_registers_init(void)
+{
+    status_reg_init(&active);
+    status_reg_init(&latched);
+}
+
+/* Producer write path: record both states when the condition occurs. */
+void fault_report(uint16_t id)
+{
+    status_reg_set_fault(&active, id);
+    status_reg_set_fault(&latched, id);
+}
+
+/* Condition recovery clears only the live state. */
+void fault_recover(uint16_t id)
+{
+    status_reg_clear_fault(&active, id);
+}
+
+/* The acknowledgement authority clears history after recovery. */
+void fault_ack(uint16_t id)
+{
+    if (!status_reg_is_fault_set(&active, id)) {
+        status_reg_clear_fault(&latched, id);
+    }
+}
+```
+
+Update both registers in the producer write path. A polling reader can miss a transient condition and cannot maintain the latch reliably. The two set calls are individually atomic but are not one transaction.
+
 ## Configuration
 
 Override options with compiler definitions passed consistently when compiling
