@@ -9,9 +9,9 @@
  *
  * @details
  *    Every tunable below is wrapped in an `#ifndef` guard, so a consumer can
- *    override any of them *without forking the library* by defining the macro
- *    first, either with a compiler flag (`-DNUM_STATUS_BANKS=8`) or by placing
- *    its own `config/status_conf.h` earlier on the include path. The shipped
+ *    override any of them *without forking the library* with a compiler
+ *    definition (for example, `-DNUM_STATUS_BANKS=8`). Pass each definition
+ *    consistently when compiling the library and every consumer. The shipped
  *    values here are the fallback defaults.
  *
  *    The atomic backend is auto-discovered (GCC/Clang `__atomic` -> C11
@@ -21,8 +21,8 @@
  *    hardware-backed paths, so no caller-supplied critical section is required
  *    for interrupt- or core-concurrent bit operations.
  *
- *    Include order: `status_conf.h` is pulled in automatically by `status.h`,
- *    but it is safe (and recommended) to include it explicitly first.
+ *    `status_conf.h` is pulled in automatically by `status.h`. Use compiler
+ *    definitions to select configuration before either file is compiled.
  */
 #ifndef STATUS_CONF_H_
 #define STATUS_CONF_H_

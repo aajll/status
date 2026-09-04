@@ -43,3 +43,13 @@ test_no_atomics_exe = executable(
   include_directories: public_headers,
 )
 test('status no-atomics backend', test_no_atomics_exe)
+
+# Copied-source consumer smoke test. The documented -D override must apply to
+# the public header and the copied status.c implementation alike.
+test_copy_in_exe = executable(
+  'test_copy_in',
+  ['test_copy_in.c'] + library_sources,
+  c_args: ['-DNUM_STATUS_BANKS=2', '-Werror'],
+  include_directories: public_headers,
+)
+test('status copy-in configuration', test_copy_in_exe)

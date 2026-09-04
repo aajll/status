@@ -20,10 +20,11 @@ Tracks faults, warnings, and info bits using banked bitfields encoded as compact
 
 ### Copy-in (recommended for embedded targets)
 
-Copy two files into your project tree:
+Copy these files into your project tree:
 
 ```
 include/status.h
+include/status_conf.h
 src/status.c
 ```
 
@@ -94,7 +95,9 @@ void check_system(void)
 
 ## Configuration
 
-All options can be overridden before including the header (e.g. via compiler flags or a `config/status_conf.h` placed earlier on the include path):
+Override options with compiler definitions passed consistently when compiling
+`status.c` and every translation unit that includes `status.h` (for example,
+`-DNUM_STATUS_BANKS=8`):
 
 | Option                                                                        | Description                                                                       | Default |
 | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------- |
