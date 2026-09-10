@@ -10,12 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Documented the caller-owned `status_reg_*` interface with per-function contracts and added it, with `status_snapshot_next()`, to the README API reference.
 - Caller-owned `status_reg_t` registers with independent banks, trackers, and error callbacks. The existing singleton interface remains available as compatibility wrappers.
 - Atomic per-bit test-and-clear operations for singleton and caller-owned registers.
 - Deterministic enumeration of active IDs from caller-owned snapshots.
 
 ### Fixed
 
+- Corrected the atomicity contracts: setters update banks and trackers separately, and tracker reads during overlapping setters can still return an earlier ID or `STATUS_UNSET_ID`. Documented backend protection requirements and exclusive access during caller-owned initialisation.
 - Protected error-callback pointer access with critical-section hooks on the no-atomics backend.
 - Wrapped every no-atomics bank and tracker load and store in the critical-section hooks, so a 16-bit access cannot tear or lose an update on 8-bit targets.
 - Corrected the active and latched fault composition example: acknowledgement now serialises with producers instead of racing them, and the producer visibility window is documented.
