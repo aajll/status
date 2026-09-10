@@ -5,7 +5,8 @@ digraph {
 Encoded Status ID (16 bits)" fillcolor=lightgray shape=box style=filled]
 	bank_field [label="Bits 4–15
 Bank Field (12 bits)
-Valid Range: 0–4095" fillcolor=lightblue shape=box style=filled]
+Representable: 0–4095
+Usable: bank < NUM_STATUS_BANKS (≤ 4094)" fillcolor=lightblue shape=box style=filled]
 	bit_field [label="Bits 0–3
 Bit Field (4 bits)
 Valid Range: 0–15" fillcolor=lightyellow shape=box style=filled]

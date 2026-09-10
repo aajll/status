@@ -51,7 +51,8 @@ meson test -C build --verbose
 ### Build & configuration
 
 - Use the Meson build system. Do not introduce CMake, Make, or other systems.
-- Update `src/meson.build` when adding or removing source files.
+- Update the root `meson.build` when adding or removing library source files,
+  and `tests/meson.build` when adding or removing test files.
 
 ### Formatting
 

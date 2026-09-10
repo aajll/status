@@ -10,7 +10,8 @@ test_exe = executable(
 )
 test('status module', test_exe)
 
-# Concurrent lost-update detection across 16 threads sharing one bank word.
+# Concurrent lost-update detection: eight workers own two adjacent bits each,
+# so together they fully populate one shared 16-bit bank word.
 # This same executable, rebuilt with -Db_sanitize=thread, is the TSAN-clean
 # concurrency gate (separate CI job; see ci.yml).
 test_mt_exe = executable(
