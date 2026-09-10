@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Protected error-callback pointer access with critical-section hooks on the no-atomics backend.
 - Wrapped every no-atomics bank and tracker load and store in the critical-section hooks, so a 16-bit access cannot tear or lose an update on 8-bit targets.
+- Corrected the active and latched fault composition example: acknowledgement now serialises with producers instead of racing them, and the producer visibility window is documented.
 - Corrected copy-in installation and compile-time configuration guidance, with a consumer smoke test.
 - Made the public header compile as C++17 by routing the lock-free checks through a shared assertion macro; documented that the forced C11-atomics backend is C-only.
 
