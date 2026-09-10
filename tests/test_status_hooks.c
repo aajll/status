@@ -78,6 +78,37 @@ main(void)
         TEST_ASSERT(critical_exit_count == 1u);
         TEST_ASSERT(critical_depth == 0u);
 
+        /* A bank read is one protected load, and status_reg_any stops at the
+         * first non-zero bank. */
+        status_reg_set_fault(&reg, id);
+        reset_critical_state();
+        TEST_ASSERT(status_reg_any(&reg, STATUS_CLASS_FAULT));
+        TEST_ASSERT(critical_enter_count == 1u);
+        TEST_ASSERT(critical_exit_count == 1u);
+        TEST_ASSERT(critical_depth == 0u);
+
+        /* A tracker read is one protected load. */
+        TEST_ASSERT(status_reg_last_fault(&reg) == id);
+        TEST_ASSERT(critical_enter_count == 2u);
+        TEST_ASSERT(critical_exit_count == 2u);
+        TEST_ASSERT(critical_depth == 0u);
+
+        /* Clearing a class is one protected store per bank. */
+        reset_critical_state();
+        status_reg_clear_all(&reg, STATUS_CLASS_FAULT);
+        TEST_ASSERT(critical_enter_count == (uint32_t)NUM_STATUS_BANKS);
+        TEST_ASSERT(critical_exit_count == (uint32_t)NUM_STATUS_BANKS);
+        TEST_ASSERT(critical_depth == 0u);
+
+        /* Setting a bit protects the bank store and the tracker store, so the
+         * OR and the tracker STORE each take one section. Before the tearing
+         * fix the tracker store was unguarded and this count was 1. */
+        reset_critical_state();
+        status_set_fault(id);
+        TEST_ASSERT(critical_enter_count == 2u);
+        TEST_ASSERT(critical_exit_count == 2u);
+        TEST_ASSERT(critical_depth == 0u);
+
         reset_critical_state();
         status_set_err_callback(NULL);
         TEST_ASSERT(critical_enter_count == 1u);

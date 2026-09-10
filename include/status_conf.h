@@ -148,14 +148,16 @@
 #else /* STATUS_USE_NO_ATOMICS */
 
 /*
- * Degenerate uniprocessor fallback. A `volatile` aligned 16-bit bank or
- * tracker load/store is a single indivisible access on the targets this path
- * serves, so LOAD and STORE need no guard. The OR/AND read-modify-write is NOT
- * indivisible, so it is wrapped in the caller's critical section to stay
- * interrupt-safe. Callback pointers can be wider, so status.c also wraps their
- * load/store with these hooks and invokes callbacks after leaving the section.
- * With the default no-op hooks this backend is correct only when no context can
- * preempt a set/clear or callback-pointer access.
+ * Degenerate uniprocessor fallback. A 16-bit bank or tracker access is NOT
+ * guaranteed to be a single indivisible machine operation: this path also
+ * serves 8-bit targets, where a 16-bit load or store is two byte accesses and
+ * an interrupt between them can return a torn value or lose an update. Every
+ * bank and tracker load and store therefore runs inside the caller's critical
+ * section, exactly like the non-indivisible OR/AND read-modify-write. Callback
+ * pointers can be wider still, so status.c wraps their load and store with
+ * these hooks too and invokes callbacks after leaving the section. With the
+ * default no-op hooks this backend is correct only when no context can preempt
+ * an access.
  */
 
 /*
@@ -185,10 +187,46 @@
 #define STATUS_EXIT_CRITICAL()
 #endif
 
-#define STATUS_ATOMIC_QUAL            volatile
-#define STATUS_ATOMIC_INIT(ptr, val)  ((void)(*(ptr) = (val)))
-#define STATUS_ATOMIC_LOAD(ptr)       (*(ptr))
-#define STATUS_ATOMIC_STORE(ptr, val) ((void)(*(ptr) = (val)))
+#define STATUS_ATOMIC_QUAL volatile
+
+/*
+ * A macro cannot both hold a critical section and yield a value, so the 16-bit
+ * load and store are `static inline` helpers. They are the only place the
+ * fallback has to protect a plain access; the atomic backends do not compile
+ * them at all.
+ */
+static inline uint16_t
+status_conf_load_u16(const STATUS_ATOMIC_QUAL uint16_t *ptr)
+{
+        uint16_t value;
+
+        STATUS_ENTER_CRITICAL();
+        value = *ptr;
+        STATUS_EXIT_CRITICAL();
+        return value;
+}
+
+static inline void
+status_conf_store_u16(STATUS_ATOMIC_QUAL uint16_t *ptr, uint16_t value)
+{
+        STATUS_ENTER_CRITICAL();
+        *ptr = value;
+        STATUS_EXIT_CRITICAL();
+}
+
+/*
+ * INIT is also used to initialise the error-callback pointer, which has a
+ * different type, so it stores through a type-agnostic statement macro rather
+ * than the uint16_t helper.
+ */
+#define STATUS_ATOMIC_INIT(ptr, val)                                           \
+        do {                                                                   \
+                STATUS_ENTER_CRITICAL();                                       \
+                *(ptr) = (val);                                                \
+                STATUS_EXIT_CRITICAL();                                        \
+        } while (0)
+#define STATUS_ATOMIC_LOAD(ptr)       status_conf_load_u16(ptr)
+#define STATUS_ATOMIC_STORE(ptr, val) status_conf_store_u16((ptr), (val))
 #define STATUS_ATOMIC_OR(ptr, val)                                             \
         do {                                                                   \
                 STATUS_ENTER_CRITICAL();                                       \

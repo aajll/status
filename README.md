@@ -189,7 +189,7 @@ Atomicity is **per call, not per logical group**. A multi-bit observation such a
 
 ### Targets without lock-free atomics
 
-On a toolchain with no `<stdatomic.h>` and no `__atomic` builtins (or where 16-bit atomics are not lock-free, e.g. some Cortex-M0-class cores), select `STATUS_USE_NO_ATOMICS` and supply the critical-section hooks. They are consulted only on this backend, must be defined as a matched pair, and must **save and restore** interrupt state rather than unconditionally re-enabling interrupts on exit:
+On a toolchain with no `<stdatomic.h>` and no `__atomic` builtins (or where 16-bit atomics are not lock-free, e.g. some Cortex-M0-class cores), select `STATUS_USE_NO_ATOMICS` and supply the critical-section hooks. They are consulted only on this backend, must be defined as a matched pair, and must **save and restore** interrupt state rather than unconditionally re-enabling interrupts on exit. Every bank and tracker load and store on this backend is wrapped in the hooks: an 8-bit target cannot guarantee that a 16-bit access is indivisible, so the section is what makes the access atomic:
 
 ```c
 /* Save PRIMASK, then disable interrupts */
