@@ -44,6 +44,17 @@
 #define NUM_STATUS_BANKS (12u)
 #endif
 
+/*
+ * The bank index occupies the top 12 bits of a status ID, so the largest
+ * representable bank is 4095. That value is reserved: bank 4095 / bit 15 spells
+ * STATUS_UNSET_ID, so a usable bank index must stay below it. Reject an
+ * out-of-range configuration here, where every translation unit that includes
+ * this header sees it, rather than only in the library build.
+ */
+#if (NUM_STATUS_BANKS < 1) || (NUM_STATUS_BANKS > 4095)
+#error "status: NUM_STATUS_BANKS must be in the range 1..4095"
+#endif
+
 /* ================ ATOMIC BACKEND SELECTION =============================== */
 
 /**
@@ -166,8 +177,8 @@
  * can actually observe a half-configured consumer.
  */
 #if defined(STATUS_ENTER_CRITICAL) != defined(STATUS_EXIT_CRITICAL)
-#error "status: define both STATUS_ENTER_CRITICAL and STATUS_EXIT_CRITICAL, "   \
-    "or neither"
+#error "status: define both STATUS_ENTER_CRITICAL and "                      \
+    "STATUS_EXIT_CRITICAL, or neither"
 #endif
 
 /**

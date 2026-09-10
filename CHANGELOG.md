@@ -17,6 +17,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Corrected stale README claims: the lock-free and interrupt- and core-safe guarantees hold on the GNU and C11 backends only, ISR signalling uses the critical-section hooks on the no-atomics backend only, and a `status_reg_t` is caller-allocated rather than static.
+- Corrected the `STATUS_ENCODE` diagram: the 12-bit bank field can represent 0–4095, but a usable bank must be below `NUM_STATUS_BANKS`, so 4095 is never usable.
+- Rejected `NUM_STATUS_BANKS` outside the range 1–4095 in `status_conf.h`, so an out-of-range configuration fails at compile time in every translation unit instead of only in the library build.
+- Matched the `status_reg_*` definition parameter names to the public declarations.
 - Corrected the atomicity contracts: setters update banks and trackers separately, and tracker reads during overlapping setters can still return an earlier ID or `STATUS_UNSET_ID`. Documented backend protection requirements and exclusive access during caller-owned initialisation.
 - Protected error-callback pointer access with critical-section hooks on the no-atomics backend.
 - Wrapped every no-atomics bank and tracker load and store in the critical-section hooks, so a 16-bit access cannot tear or lose an update on 8-bit targets.
@@ -26,6 +30,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Made `.github/workflows/ci.yml` the single CI workflow by removing the duplicate `test.yml`.
+- Aligned `CONTRIBUTING.md` and `AGENTS.md` with the commands and files they describe: coverage passes `-fprofile-update=atomic`, ThreadSanitizer is listed as a required check, the source-list pointer is the root `meson.build`, and the concurrency test comment matches its eight workers.
 - Documented active and latched fault composition using independent registers.
 - Added development guidance for visible invalid-input handling without changing nonfatal production defaults.
 

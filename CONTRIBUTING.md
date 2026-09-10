@@ -13,9 +13,12 @@ meson setup build --buildtype=debug -Dbuild_tests=true \
 meson compile -C build
 meson test -C build --verbose
 
-# Coverage (CI gate is 80% line + 70% branch)
+# Coverage (CI gate is 80% line + 70% branch). -fprofile-update=atomic keeps
+# gcov's counter increments atomic; without it the multi-threaded tests race on
+# them and gcov aborts the report with negative branch counts (gcc bug 68080).
 meson setup build_cov --buildtype=debug -Dbuild_tests=true \
-                      -Db_coverage=true
+                      -Db_coverage=true \
+                      -Dc_args=-fprofile-update=atomic
 meson compile -C build_cov && meson test -C build_cov
 gcovr --root . --filter 'src/' --filter 'include/' --print-summary
 ```
@@ -59,7 +62,7 @@ Keep the subject under ~70 characters. Use the body to explain _why_ the change 
 
 - Open an issue first for non-trivial changes so the design can be agreed before implementation.
 - Keep PRs focused. One feature or one fix per PR.
-- All CI checks must pass: tests on Linux + macOS, ASan + UBSan, release build, and coverage gate.
+- All CI checks must pass: tests on Linux + macOS, ASan + UBSan, ThreadSanitizer, release build, and coverage gate.
 
 ## When in doubt
 
