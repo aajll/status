@@ -101,3 +101,27 @@ test_reg_no_atomics_exe = executable(
   include_directories: public_headers,
 )
 test('status register no-atomics backend', test_reg_no_atomics_exe)
+
+# Optional C++17 header smoke test. status.h is wrapped in extern "C" and must
+# compile and link from C++. Only the default (GNU) and no-atomics backends are
+# exercised: the forced C11 backend expands STATUS_ATOMIC_QUAL to _Atomic, which
+# is not a C++ type qualifier. add_languages(..., required: false) keeps C-only
+# toolchains working; the tests are skipped when no C++ compiler is present.
+if add_languages('cpp', required: false)
+  test_cpp_header_exe = executable(
+    'test_header_cpp',
+    ['test_header_cpp.cpp'],
+    dependencies: [status_dep],
+    cpp_args: ['-std=c++17', '-Werror'],
+  )
+  test('status c++ header (default backend)', test_cpp_header_exe)
+
+  test_cpp_header_no_atomics_exe = executable(
+    'test_header_cpp_no_atomics',
+    ['test_header_cpp.cpp'] + library_sources,
+    c_args: ['-DSTATUS_USE_NO_ATOMICS=1', '-Werror'],
+    cpp_args: ['-DSTATUS_USE_NO_ATOMICS=1', '-std=c++17', '-Werror'],
+    include_directories: public_headers,
+  )
+  test('status c++ header (no-atomics backend)', test_cpp_header_no_atomics_exe)
+endif
