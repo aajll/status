@@ -29,6 +29,18 @@ test_reg_mt_exe = executable(
 )
 test('status register concurrency', test_reg_mt_exe, timeout: 120)
 
+# Documented active/latched composition. The acknowledgement path must not clear
+# history a producer has just recorded, so the composition holds one lock across
+# the producer pair and the check-then-clear. Races both paths and asserts the
+# invariant the lock exists to uphold. TSan-clean like the lost-update test.
+test_latch_exe = executable(
+  'test_status_latch_compose',
+  ['test_status_latch_compose.c'],
+  dependencies: [status_dep, thread_dep],
+  c_args: ['-Werror'],
+)
+test('status latch composition', test_latch_exe, timeout: 120)
+
 # Forced C11 <stdatomic.h> backend. The default on GCC/Clang is the __atomic
 # path, so this rebuilds the library sources with the -D for both the suite and
 # the core to exercise that backend and its lock-free static assertion.

@@ -128,29 +128,53 @@ void fault_registers_init(void)
     status_reg_init(&latched);
 }
 
-/* Producer write path: record both states when the condition occurs. */
+/* The primitive supplies no lock. Serialise the producer and acknowledgement
+   paths with one appropriate to the target: an interrupt-masking section on a
+   single core, or an ISR-safe lock when faults can be reported from an ISR. */
+static void faults_lock(void);
+static void faults_unlock(void);
+
+/* Producer write path: record both states while holding the lock. */
 void fault_report(uint16_t id)
 {
+    faults_lock();
     status_reg_set_fault(&active, id);
     status_reg_set_fault(&latched, id);
+    faults_unlock();
 }
 
-/* Condition recovery clears only the live state. */
+/* Condition recovery clears only the live state. This path cannot discard
+   history, so it needs no lock. */
 void fault_recover(uint16_t id)
 {
     status_reg_clear_fault(&active, id);
 }
 
-/* The acknowledgement authority clears history after recovery. */
+/* The acknowledgement authority clears history after recovery. The check and
+   the clear must be one serialised unit. */
 void fault_ack(uint16_t id)
 {
+    faults_lock();
     if (!status_reg_is_fault_set(&active, id)) {
         status_reg_clear_fault(&latched, id);
     }
+    faults_unlock();
 }
 ```
 
-Update both registers in the producer write path. A polling reader can miss a transient condition and cannot maintain the latch reliably. The two set calls are individually atomic but are not one transaction.
+Update both registers in the producer write path. A polling reader can miss a transient condition and cannot maintain the latch reliably.
+
+The two set calls are individually atomic but are not one transaction. Without a lock the acknowledgement can clear history the producer has just recorded:
+
+1. `fault_ack` observes `active` as clear.
+2. The producer sets `active`, then sets `latched`.
+3. `fault_ack` clears `latched`.
+
+The result is an active fault with no latched history. Holding `faults_lock()` across the producer's two writes and across the acknowledgement's check and clear removes that interleaving. `fault_recover` needs no lock, because clearing `active` cannot create the state this composition must avoid.
+
+Serialising the group upholds one invariant: **if `active` is set, `latched` is set**. The producer's two writes are atomic only with respect to lock holders, so an unlocked reader can still observe `active` set while `latched` is clear. The window spans the producer's second `status_reg_set_fault()` call and closes when the producer releases the lock; a reader that needs a consistent view of both registers must take the same lock.
+
+Two lock-free alternatives carry assumptions worth stating. Clearing `latched` and then re-reading `active`, re-latching if it has become set, is correct provided the clear is not reordered with the re-read: no interleaving can then lose history, because the producer writes `active` before `latched` while the acknowledgement reads `active` after clearing. The argument is subtle to review, so prefer the lock. Otherwise require producer quiescence through an explicit contract: `fault_ack` is called only when no producer for `id` can run. If producers can run in an ISR, the lock must be ISR-safe or mask interrupts, and `fault_ack` must not be called from an ISR when the lock can block.
 
 ## Configuration
 
