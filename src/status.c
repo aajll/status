@@ -64,6 +64,9 @@ load_err_cb(const status_reg_t *reg)
 #if defined(STATUS_USE_NO_ATOMICS)
         status_err_cb_t cb;
 
+        /* The callback pointer is not a bank word, so it is protected here
+         * rather than by the uint16_t accessor. This is the only critical
+         * section the load takes; nothing inside may take another. */
         STATUS_ENTER_CRITICAL();
         cb = reg->err_cb;
         STATUS_EXIT_CRITICAL();
@@ -77,6 +80,8 @@ static void
 store_err_cb(status_reg_t *reg, status_err_cb_t cb)
 {
 #if defined(STATUS_USE_NO_ATOMICS)
+        /* Single, non-nested section: the uint16_t accessors are not used for
+         * the callback pointer, so there is nothing to re-enter. */
         STATUS_ENTER_CRITICAL();
         reg->err_cb = cb;
         STATUS_EXIT_CRITICAL();
