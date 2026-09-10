@@ -164,6 +164,15 @@ Override options with compiler definitions passed consistently when compiling
 | `STATUS_USE_GNU_ATOMICS` / `STATUS_USE_C11_ATOMICS` / `STATUS_USE_NO_ATOMICS` | Force the atomic backend instead of auto-discovery                                | auto    |
 | `STATUS_ENTER_CRITICAL()` / `STATUS_EXIT_CRITICAL()`                          | Critical-section hooks, consulted **only** on the `STATUS_USE_NO_ATOMICS` backend | no-op   |
 
+### C++ consumers
+
+`status.h` is wrapped in `extern "C"` and compiles as C++17 with the default
+auto-discovered backend (GNU/Clang `__atomic`) or with `STATUS_USE_NO_ATOMICS`.
+The forced `STATUS_USE_C11_ATOMICS` backend is **C-only**: `STATUS_ATOMIC_QUAL`
+expands to `_Atomic`, which is not a C++ type qualifier even in C++23. A C++
+translation unit that cannot use `__atomic` builtins must select
+`STATUS_USE_NO_ATOMICS` and supply the [critical-section hooks](#targets-without-lock-free-atomics).
+
 ## Development error handling
 
 Invalid input is a no-op when no error callback is registered. During development and testing, register a loud application callback so a bad ID, class, pointer, or length fails visibly. The handler can log, assert, or stop the test according to the target's policy.

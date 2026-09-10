@@ -63,6 +63,11 @@
  * Use when the toolchain provides C11 atomics and the project wants to avoid
  * compiler-specific `__atomic` builtins. Define exactly one backend-selection
  * macro consistently for the library build and all consumers.
+ *
+ * @note This backend is C-only. `STATUS_ATOMIC_QUAL` expands to `_Atomic`,
+ *       which is not a C++ type qualifier, so a C++ translation unit cannot
+ *       use it. C++ consumers must select the GNU `__atomic` backend or
+ *       `STATUS_USE_NO_ATOMICS` instead.
  */
 
 /**
@@ -124,6 +129,8 @@
 #elif defined(STATUS_USE_C11_ATOMICS)
 
 #include <stdatomic.h>
+/* C-only: `_Atomic` is not a C++ type qualifier. A C++ translation unit must
+ * select the GNU __atomic backend or STATUS_USE_NO_ATOMICS instead. */
 #define STATUS_ATOMIC_QUAL           _Atomic
 #define STATUS_ATOMIC_INIT(ptr, val) atomic_init((ptr), (val))
 #define STATUS_ATOMIC_LOAD(ptr)                                                \

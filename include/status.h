@@ -148,15 +148,31 @@ typedef struct {
  * cannot satisfy this must select STATUS_USE_NO_ATOMICS and supply the
  * critical-section hooks instead.
  */
+
+/*
+ * Shared compile-time assertion. C++ spells the keyword `static_assert`; C11
+ * spells it `_Static_assert`. Routing both through one macro keeps the public
+ * header compilable as both C11 and C++17. The project targets C11, so the
+ * non-C++ branch can rely on `_Static_assert` being available.
+ */
+#if defined(__cplusplus)
+#define STATUS_STATIC_ASSERT(condition, message)                               \
+        static_assert(condition, message)
+#else
+#define STATUS_STATIC_ASSERT(condition, message)                               \
+        _Static_assert(condition, message)
+#endif
+
 #if defined(STATUS_USE_GNU_ATOMICS)
 /* __atomic_always_lock_free is a compile-time constant but not a "standard"
- * integer constant expression, so -Wpedantic objects to it inside a
- * _Static_assert; suppress just that diagnostic here. */
+ * integer constant expression, so -Wpedantic objects to it inside a static
+ * assertion; suppress just that diagnostic here. */
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
-_Static_assert(__atomic_always_lock_free(sizeof(uint16_t), 0),
-               "status: uint16_t bank storage is not lock-free on this target");
-_Static_assert(
+STATUS_STATIC_ASSERT(
+    __atomic_always_lock_free(sizeof(uint16_t), 0),
+    "status: uint16_t bank storage is not lock-free on this target");
+STATUS_STATIC_ASSERT(
     __atomic_always_lock_free(sizeof(status_err_cb_t), 0),
     "status: error-callback pointer is not lock-free on this target");
 #pragma GCC diagnostic pop
@@ -164,11 +180,11 @@ _Static_assert(
 /* The C11 path has no size-based lock-free query (atomic_is_lock_free is a
  * runtime call), so match the bank width to the matching ATOMIC_*_LOCK_FREE
  * macro and require "always lock-free" (== 2). */
-_Static_assert(
+STATUS_STATIC_ASSERT(
     (sizeof(uint16_t) == sizeof(short) && ATOMIC_SHORT_LOCK_FREE == 2)
         || (sizeof(uint16_t) == sizeof(int) && ATOMIC_INT_LOCK_FREE == 2),
     "status: uint16_t bank storage is not always-lock-free on this target");
-_Static_assert(
+STATUS_STATIC_ASSERT(
     ATOMIC_POINTER_LOCK_FREE == 2,
     "status: error-callback pointer is not always-lock-free on this target");
 #endif
