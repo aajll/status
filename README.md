@@ -209,7 +209,11 @@ Setting or clearing a single status bit is a genuine atomic read-modify-write on
 
 The atomic mechanism is chosen at compile time in `status_conf.h`, auto-discovered as GCC/Clang `__atomic` → C11 `<stdatomic.h>` → a degenerate uniprocessor fallback. The two atomic backends statically assert that the bank word (`uint16_t`) and the error-callback pointer are _always_ lock-free on the target: a target that cannot satisfy that contract fails to compile rather than silently pulling in a hidden lock.
 
-Atomicity is **per call, not per logical group**. A multi-bit observation such as `status_any()` or `status_snapshot()` reads each bank atomically but is not one consistent instant of the whole class, and a set-then-read across two API calls is not a single transaction. A caller that needs grouped atomicity must serialise the group itself.
+Atomicity applies to **each bank operation, not necessarily a whole call**. A setter performs an atomic bank read-modify-write followed in program order by a separate atomic tracker store. Other contexts need not observe these relaxed accesses together or in that order. See [Last Set](#last-set) for the tracker contract.
+
+Scans and snapshots read each bank atomically, but do not capture one consistent instant of the whole class. This applies to both singleton and caller-owned functions. Callers must serialise operations when they need a consistent view across banks or between banks and trackers.
+
+On the no-atomics backend, these guarantees require protection for every accessing context. With default no-op hooks, accesses must neither overlap nor preempt each other. Interrupt masking protects one core only, not concurrent accesses from other cores.
 
 ### Targets without lock-free atomics
 
@@ -288,16 +292,64 @@ uint16_t status_last_warning(void);
 uint16_t status_last_info(void);
 ```
 
-Returns the most recently set ID for that class. Does not reflect currently active bits — use `status_any()` for that.
+Returns the class tracker, not a snapshot of currently active bits. Use `status_any()` to check for active bits. Clear operations preserve trackers. Initialisation resets them to `STATUS_UNSET_ID`.
+
+The tracker records tracker-store order, not call-completion order. A read during overlapping setters may still return an earlier ID or `STATUS_UNSET_ID`, even after the bank bits have changed. For two valid setters of the same class, synchronise with both completions before reading the tracker. Either ID may remain if no other setter or initialisation intervenes. Without intervening clears, both bits remain set. These rules also apply to the caller-owned last-ID getters.
 
 ### Snapshot
 
 ```c
 void status_snapshot(enum status_class cls, uint16_t *dst, size_t len);
+bool status_snapshot_next(const uint16_t *snapshot, size_t len, size_t *cursor,
+                          uint16_t *id);
 ```
 
 Copies up to `len` banks for the given class into `dst`, capped at
 `NUM_STATUS_BANKS`. Passing `len == 0` reports an error.
+
+`status_snapshot_next()` enumerates a buffer filled by `status_snapshot()` or `status_reg_snapshot()`. It returns `true` with the next active ID, or `false` at the end or for a NULL pointer argument. `len` is the number of valid banks in the buffer, capped at `NUM_STATUS_BANKS`. Initialise `cursor` to zero and preserve it between calls. Keep the buffer unchanged throughout traversal. Enumeration does not read the live register. Take a new snapshot to include later changes.
+
+### Caller-Owned Registers
+
+A `status_reg_t` provides banks, trackers, and an error callback independent of the singleton. Allocate it statically or automatically and initialise it before use. Initialisation and re-initialisation require exclusive access: no other context may read or write the register. Initialisation does not use concurrent atomic stores on the GNU and C11 backends. Synchronise with other users before access resumes.
+
+```c
+void status_reg_init(status_reg_t *reg);
+void status_reg_set_err_callback(status_reg_t *reg, status_err_cb_t cb);
+
+void status_reg_set_fault(status_reg_t *reg, uint16_t id);
+void status_reg_set_warning(status_reg_t *reg, uint16_t id);
+void status_reg_set_info(status_reg_t *reg, uint16_t id);
+
+void status_reg_clear_fault(status_reg_t *reg, uint16_t id);
+void status_reg_clear_warning(status_reg_t *reg, uint16_t id);
+void status_reg_clear_info(status_reg_t *reg, uint16_t id);
+
+bool status_reg_test_and_clear_fault(status_reg_t *reg, uint16_t id);
+bool status_reg_test_and_clear_warning(status_reg_t *reg, uint16_t id);
+bool status_reg_test_and_clear_info(status_reg_t *reg, uint16_t id);
+
+bool status_reg_is_fault_set(const status_reg_t *reg, uint16_t id);
+bool status_reg_is_warning_set(const status_reg_t *reg, uint16_t id);
+bool status_reg_is_info_set(const status_reg_t *reg, uint16_t id);
+
+bool status_reg_any(const status_reg_t *reg, enum status_class cls);
+void status_reg_clear_all(status_reg_t *reg, enum status_class cls);
+
+uint16_t status_reg_last_fault(const status_reg_t *reg);
+uint16_t status_reg_last_warning(const status_reg_t *reg);
+uint16_t status_reg_last_info(const status_reg_t *reg);
+
+void status_reg_snapshot(const status_reg_t *reg, enum status_class cls,
+                         uint16_t *dst, size_t len);
+```
+
+Every function takes the register as its first argument and otherwise mirrors the singleton of the same name, including the invalid-input model and the [concurrency contract](#concurrency). Two differences matter:
+
+- A NULL register is silent rather than reported, because there is no instance callback to report through. Mutators, `status_reg_init()`, `status_reg_clear_all()`, and `status_reg_snapshot()` do nothing; predicates and test-and-clear return `false`; the last-ID getters return `STATUS_UNSET_ID`.
+- `status_reg_init()` also clears that register's error callback. The singleton `status_init()` deliberately preserves its callback so errors during re-initialisation are still reported; re-register with `status_reg_set_err_callback()` after initialising a caller-owned register.
+
+Do not copy or move a register while it is active. Multiple subsystems may share it under the [concurrency contract](#concurrency). Callbacks are per register and run synchronously in the calling context, which may be an ISR. They must be short, non-blocking, and safe for every calling context. They run outside internal protection and may re-enter the status API.
 
 ### ID Encoding Helpers
 
