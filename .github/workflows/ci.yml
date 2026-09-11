@@ -194,3 +194,54 @@ jobs:
         with:
           name: coverage-report
           path: coverage-report/
+
+  # ---------------------------------------------------------------------------
+  # MISRA C:2023 static analysis via misch (cppcheck + misra addon), driven by
+  # misra.toml. All three atomic backends are audited: the default GNU __atomic
+  # branch plus the c11-atomics and no-atomics profiles, which the Meson build
+  # never selects on its own. The audit is clean, so the job gates on zero
+  # findings. The copyrighted rule texts are never committed: set a
+  # MISRA_RULE_TEXTS repository secret (the file's contents) to get categorised
+  # output; without it findings are still detected and still fail the job, only
+  # headlines/categories are absent. `misch deviations` enforces that every
+  # suppression carries a justification.
+  # ---------------------------------------------------------------------------
+  misra:
+    name: "MISRA (misch)"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install ninja and cppcheck
+        run: sudo apt-get update -q && sudo apt-get install -y ninja-build cppcheck
+
+      - name: Install meson and misch
+        run: pip install meson misch
+
+      - name: Provide MISRA rule texts (optional secret)
+        env:
+          RULE_TEXTS: ${{ secrets.MISRA_RULE_TEXTS }}
+        run: |
+          if [ -n "$RULE_TEXTS" ]; then
+            printf '%s\n' "$RULE_TEXTS" > "$RUNNER_TEMP/misra_rule_texts.txt"
+            echo "MISRA_RULE_TEXTS=$RUNNER_TEMP/misra_rule_texts.txt" >> "$GITHUB_ENV"
+          else
+            echo "No MISRA_RULE_TEXTS secret; findings will be category: unknown."
+          fi
+
+      - name: Analyse (default GNU __atomic backend)
+        run: misch run -v
+
+      - name: Analyse (C11 atomics profile)
+        run: misch run --profile c11-atomics -v
+
+      - name: Analyse (no-atomics profile)
+        run: misch run --profile no-atomics -v
+
+      - name: Deviation record
+        run: misch deviations

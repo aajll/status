@@ -1,0 +1,55 @@
+# Project-level MISRA deviations (cppcheck suppressions).
+#
+# Prefer a justified inline cppcheck-suppress for a single source location.
+# Every active entry in this file must have a preceding comment that explains
+# why the deviation is necessary. Use :file or :file:line to keep its scope as
+# narrow as practical. A blank line clears the rationale, so keep each entry
+# directly below its comment block.
+#
+# Audit this file and inline deviations with:
+#   misch deviations --check-stale
+
+# Rule 15.5 (advisory), "A function should have a single point of exit at the
+# end": suppressed project-wide as a deliberate house style. Guards that return
+# early on an invalid argument, and branch-per-outcome returns, are clearer and
+# less error-prone than threading a result variable through nested if/else.
+# None of these functions acquire a resource, take a lock, or have teardown, so
+# there is no shared cleanup for a single exit point to protect. Advisory;
+# deviation accepted.
+misra-c2012-15.5
+
+# Rule 8.7 (advisory), "Functions and objects should not be defined with
+# external linkage if they are referenced in only one translation unit":
+# suppressed project-wide. status is a library; its public API in status.h has
+# external linkage by design and is only referenced from a single translation
+# unit within any given consumer build. The single-TU reference counts reflect
+# library usage, not accidental linkage. Advisory; deviation accepted.
+misra-c2012-8.7
+
+# Rule 2.5 (advisory), "A project should not contain unused macro definitions":
+# suppressed for status_conf.h. It defines all three atomic backends and the
+# optional critical-section hooks; exactly one backend is selected per
+# analysis, so the macros belonging to the other branches are necessarily
+# unused in that configuration. The definitions are live in the configurations
+# that select them, which the c11-atomics and no-atomics profiles exercise.
+misra-c2012-2.5:include/status_conf.h
+
+# Rule 2.5 (advisory), the same unused-macro artifact in status.h: it defines
+# both a C and a C++ spelling of STATUS_STATIC_ASSERT, and only one language
+# branch is selected per analysis. The C spelling is also unused whenever no
+# atomic static assertion is compiled, as in the no-atomics profile.
+misra-c2012-2.5:include/status.h
+
+# Rule 17.3 (mandatory), "A function shall not be declared implicitly": tool
+# false positive, not a compliance deviation. cppcheck's misra addon flags any
+# name it cannot resolve followed by "(", but it models neither the GCC
+# __atomic builtins nor the whole C11 <stdatomic.h> API. On the default
+# (GNU __atomic) backend every finding is a __atomic_* operation; on the
+# c11-atomics profile the findings are atomic_init and the
+# atomic_fetch_or/and_explicit calls. Each of those is declared by the
+# toolchain; none is an implicit declaration. All of them are reached through
+# the STATUS_ATOMIC_* accessor macros, so the affected call sites are spread
+# across the library and a project-wide suppression is the narrowest practical
+# form. Mandatory rule, but the code is compliant and there is nothing to fix;
+# re-check when cppcheck models the C11 atomics API.
+misra-c2012-17.3

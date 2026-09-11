@@ -12,7 +12,7 @@ Tracks faults, warnings, and info bits using banked bitfields encoded as compact
 - **Three status classes** - Separate fault, warning, and info registers
 - **No dynamic memory** - Fixed-size operations, no `malloc` / `free`
 - **Atomic bit operations** - Set/clear of a single bit is a lock-free atomic read-modify-write on the GNU `__atomic` and C11 backends; interrupt- and core-safe with no caller hooks. The `STATUS_USE_NO_ATOMICS` fallback instead uses the caller's critical-section hooks
-- **MISRA-oriented** - no VLAs, no dynamic allocation, written with MISRA C:2023 / IEC 61508 in mind
+- **MISRA C:2023 analysis** - checked with `misch` (cppcheck-backed; configuration in `misra.toml`), clean across the GNU `__atomic`, C11 and `STATUS_USE_NO_ATOMICS` backends. Deviations are recorded with their rationale in `analysis/deviations/`
 - **Error callbacks** - Runtime notification of invalid IDs or null pointers
 - **Snapshot API** - Bulk-copy registers for logging or diagnostics
 

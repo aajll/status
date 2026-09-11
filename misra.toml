@@ -1,0 +1,67 @@
+# misch configuration. See the project configuration reference:
+# https://github.com/aajll/misch/blob/master/docs/configuration.md
+
+[project]
+# Analysed source roots. Directory-style entries match everything beneath
+# them; globs (e.g. "*.c") are also honoured.
+# The shipped library is src/ plus the public headers. include/ must be in
+# scope so findings located in the headers are attributed to the project
+# instead of being discarded as external.
+scope   = ["include/", "src/"]
+# Explicitly excluded. Every compile-DB file must match scope OR exclude;
+# an unclassified file is a hard error (no silent scope creep).
+exclude = ["tests/", "subprojects/"]
+
+[db]
+# Where compile_commands.json comes from: meson | cmake | existing.
+# Plain-Make projects: generate one (e.g. `bear -- make`) and use "existing".
+source = "meson"
+# path = "build/compile_commands.json"   # source = "existing" only
+
+[platform]
+# The library targets 8-bit MCUs, where int is 16 bits and pointers are 16
+# bits. cppcheck has no generic 8-bit preset, so the target data model is
+# committed as an explicit XML rather than assumed from the analysis host.
+# See analysis/README.md for the model and its limitations.
+xml = "analysis/mcu8_platform.xml"
+
+[toolchain]
+# cppcheck does not predefine __GNUC__, so its automatic backend ladder would
+# fall through to the C11 branch even though a GCC/Clang build selects GNU
+# __atomic. Pin the backend the default build actually compiles. It also does
+# not predefine the GCC __ATOMIC_* constants, so the MISRA addon cannot resolve
+# the relaxed memory order and reports incomplete configuration; supply the
+# value GCC itself predefines (__ATOMIC_RELAXED == 0). The profiles below
+# replace (not append to) this list: exactly one backend may be defined.
+defines = ["STATUS_USE_GNU_ATOMICS=1", "__ATOMIC_RELAXED=0"]
+
+[rules]
+# Bring your own licensed rule texts; see analysis/rules/README.md.
+# Precedence: $MISRA_RULE_TEXTS > this value. Absent => category: unknown.
+texts = "${MISRA_RULE_TEXTS}"
+
+[report]
+# Default output is the terminal. Add file outputs as needed, e.g.:
+#   outputs = ["terminal", {format = "json", path = "misra.json"}]
+outputs = ["terminal"]
+
+[deviations]
+# Project-level deviations; prefer justified inline suppressions.
+suppressions = "analysis/deviations/misra-deviations.txt"
+
+[baseline]
+# Created only when `misch baseline` explicitly accepts findings.
+path = "analysis/baseline/misra-baseline.json"
+
+# Atomic-backend profiles. The backend is selected by a preprocessor ladder in
+# status_conf.h, not by the Meson build, so the default compile database only
+# exercises the GNU __atomic branch. Each profile forces one of the other
+# branches and keeps its own baseline, because the findings differ.
+# Select with `misch run --profile <name>`.
+[profiles.c11-atomics]
+toolchain.defines = ["STATUS_USE_C11_ATOMICS=1"]
+baseline.path = "analysis/baseline/misra-baseline.c11-atomics.json"
+
+[profiles.no-atomics]
+toolchain.defines = ["STATUS_USE_NO_ATOMICS=1"]
+baseline.path = "analysis/baseline/misra-baseline.no-atomics.json"

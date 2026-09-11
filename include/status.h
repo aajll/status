@@ -216,8 +216,8 @@ STATUS_STATIC_ASSERT(
  * runtime call), so match the bank width to the matching ATOMIC_*_LOCK_FREE
  * macro and require "always lock-free" (== 2). */
 STATUS_STATIC_ASSERT(
-    (sizeof(uint16_t) == sizeof(short) && ATOMIC_SHORT_LOCK_FREE == 2)
-        || (sizeof(uint16_t) == sizeof(int) && ATOMIC_INT_LOCK_FREE == 2),
+    ((sizeof(uint16_t) == sizeof(short)) && (ATOMIC_SHORT_LOCK_FREE == 2))
+        || ((sizeof(uint16_t) == sizeof(int)) && (ATOMIC_INT_LOCK_FREE == 2)),
     "status: uint16_t bank storage is not always-lock-free on this target");
 STATUS_STATIC_ASSERT(
     ATOMIC_POINTER_LOCK_FREE == 2,
@@ -316,13 +316,14 @@ status_snapshot_next(const uint16_t *snapshot, size_t len, size_t *cursor,
         }
         while (*cursor < bit_count) {
                 const size_t bit = *cursor;
+                const uint16_t bank = (uint16_t)(bit / NUM_STATUS_BITS);
+                const uint16_t offset = (uint16_t)(bit % NUM_STATUS_BITS);
 
                 ++(*cursor);
-                if ((snapshot[bit / NUM_STATUS_BITS]
-                     & (uint16_t)((uint32_t)1u << (bit % NUM_STATUS_BITS)))
+                if ((snapshot[bank]
+                     & (uint16_t)((uint32_t)1u << (uint32_t)offset))
                     != 0u) {
-                        *id = STATUS_ENCODE(bit / NUM_STATUS_BITS,
-                                            bit % NUM_STATUS_BITS);
+                        *id = STATUS_ENCODE(bank, offset);
                         return true;
                 }
         }

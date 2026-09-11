@@ -126,8 +126,11 @@
 
 /** Qualifier applied to bank and tracker storage (none needed for __atomic). */
 #define STATUS_ATOMIC_QUAL
-#define STATUS_ATOMIC_INIT(ptr, val) ((void)(*(ptr) = (val)))
-#define STATUS_ATOMIC_LOAD(ptr)      __atomic_load_n((ptr), __ATOMIC_RELAXED)
+#define STATUS_ATOMIC_INIT(ptr, val)                                           \
+        do {                                                                   \
+                *(ptr) = (val);                                                \
+        } while (0)
+#define STATUS_ATOMIC_LOAD(ptr) __atomic_load_n((ptr), __ATOMIC_RELAXED)
 #define STATUS_ATOMIC_STORE(ptr, val)                                          \
         __atomic_store_n((ptr), (val), __ATOMIC_RELAXED)
 #define STATUS_ATOMIC_OR(ptr, val)                                             \
@@ -135,7 +138,9 @@
 #define STATUS_ATOMIC_AND(ptr, val)                                            \
         ((void)__atomic_fetch_and((ptr), (val), __ATOMIC_RELAXED))
 #define STATUS_ATOMIC_FETCH_AND(ptr, val, old)                                 \
-        ((void)((old) = __atomic_fetch_and((ptr), (val), __ATOMIC_RELAXED)))
+        do {                                                                   \
+                (old) = __atomic_fetch_and((ptr), (val), __ATOMIC_RELAXED);    \
+        } while (0)
 
 #elif defined(STATUS_USE_C11_ATOMICS)
 
@@ -153,8 +158,10 @@
 #define STATUS_ATOMIC_AND(ptr, val)                                            \
         ((void)atomic_fetch_and_explicit((ptr), (val), memory_order_relaxed))
 #define STATUS_ATOMIC_FETCH_AND(ptr, val, old)                                 \
-        ((void)((old) = atomic_fetch_and_explicit((ptr), (val),                \
-                                                  memory_order_relaxed)))
+        do {                                                                   \
+                (old) = atomic_fetch_and_explicit((ptr), (val),                \
+                                                  memory_order_relaxed);       \
+        } while (0)
 
 #else /* STATUS_USE_NO_ATOMICS */
 

@@ -38,6 +38,51 @@ gcovr --root . --filter 'src/' --filter 'include/' --print-summary
 - Validate pointer arguments and encoded status IDs at every public-API boundary.
 - Preserve the critical-section hook contract for interrupt-safe embedded use.
 
+## MISRA C:2023
+
+The library is analysed with `misch` (cppcheck-backed MISRA C:2023 analysis),
+configured by `misra.toml`. The audit is clean: `misch run` must report zero
+findings for the default configuration and for both backend profiles:
+
+```sh
+misch run
+misch run --profile c11-atomics
+misch run --profile no-atomics
+```
+
+The default configuration models the GNU `__atomic` backend that GCC and Clang
+builds compile. The profiles force the C11 `<stdatomic.h>` and
+`STATUS_USE_NO_ATOMICS` branches, which the Meson build never selects on its
+own. The analysis target is the 8-bit MCU data model in
+`analysis/mcu8_platform.xml`; `analysis/README.md` explains both.
+
+If your change introduces a new finding:
+
+1. Prefer restructuring the code so the rule is satisfied. Deviate only when
+   compliance would make the code genuinely worse, and never restructure purely
+   to hide a violation from the checker; an honest deviation beats evasion.
+2. Suppress at point of use with
+   `/* cppcheck-suppress misra-c2012-<rule> ; @deviation <rationale> */`, or add
+   a justified project-wide entry to `analysis/deviations/misra-deviations.txt`
+   for house-style rules. Use `:file` on a project-wide entry to keep its scope
+   as narrow as practical.
+3. Verify with the three `misch run` commands and `misch deviations` (every
+   suppression must carry a rationale), and justify the deviation in the PR
+   description.
+
+`required` and `mandatory` rule deviations face a higher bar than `advisory`.
+The project carries four project-wide rules across five entries, each with its
+rationale in `analysis/deviations/misra-deviations.txt`: 15.5 and 8.7 (advisory
+house style), 2.5 (macros of the unselected configuration branches), and 17.3
+(mandatory, but a cppcheck false positive on compiler atomic builtins, not a
+code defect). Do not add a deviation without explaining why the code cannot
+comply.
+
+The baseline files under `analysis/baseline/` are empty: the audit reports zero
+findings, so the gate is zero findings rather than a ratchet. Regenerate a
+baseline only after a deliberate review. Never commit licensed MISRA rule text;
+`analysis/rules/README.md` explains how to supply it locally or in CI.
+
 ## Tests and coverage
 
 - Add a test for every bug fix.
@@ -62,7 +107,7 @@ Keep the subject under ~70 characters. Use the body to explain _why_ the change 
 
 - Open an issue first for non-trivial changes so the design can be agreed before implementation.
 - Keep PRs focused. One feature or one fix per PR.
-- All CI checks must pass: tests on Linux + macOS, ASan + UBSan, ThreadSanitizer, release build, and coverage gate.
+- All CI checks must pass: tests on Linux + macOS, ASan + UBSan, ThreadSanitizer, release build, coverage gate, and the MISRA audit.
 
 ## When in doubt
 

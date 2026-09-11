@@ -111,7 +111,7 @@ reset_reg(status_reg_t *reg)
 }
 
 static void
-set_bit(status_reg_t *reg, STATUS_ATOMIC_QUAL uint16_t *banks,
+set_bit(const status_reg_t *reg, STATUS_ATOMIC_QUAL uint16_t *banks,
         STATUS_ATOMIC_QUAL uint16_t *last, uint16_t id)
 {
         uint16_t bank = status_bank(id);
@@ -128,7 +128,8 @@ set_bit(status_reg_t *reg, STATUS_ATOMIC_QUAL uint16_t *banks,
 }
 
 static void
-clear_bit(status_reg_t *reg, STATUS_ATOMIC_QUAL uint16_t *banks, uint16_t id)
+clear_bit(const status_reg_t *reg, STATUS_ATOMIC_QUAL uint16_t *banks,
+          uint16_t id)
 {
         uint16_t bank = status_bank(id);
 
@@ -143,7 +144,7 @@ clear_bit(status_reg_t *reg, STATUS_ATOMIC_QUAL uint16_t *banks, uint16_t id)
 }
 
 static bool
-test_and_clear_bit(status_reg_t *reg, STATUS_ATOMIC_QUAL uint16_t *banks,
+test_and_clear_bit(const status_reg_t *reg, STATUS_ATOMIC_QUAL uint16_t *banks,
                    uint16_t id)
 {
         uint16_t bank = status_bank(id);
@@ -246,32 +247,32 @@ status_reg_clear_info(status_reg_t *reg, uint16_t id)
 bool
 status_reg_test_and_clear_warning(status_reg_t *reg, uint16_t id)
 {
-        return reg != NULL && test_and_clear_bit(reg, reg->warning_banks, id);
+        return (reg != NULL) && test_and_clear_bit(reg, reg->warning_banks, id);
 }
 bool
 status_reg_test_and_clear_fault(status_reg_t *reg, uint16_t id)
 {
-        return reg != NULL && test_and_clear_bit(reg, reg->fault_banks, id);
+        return (reg != NULL) && test_and_clear_bit(reg, reg->fault_banks, id);
 }
 bool
 status_reg_test_and_clear_info(status_reg_t *reg, uint16_t id)
 {
-        return reg != NULL && test_and_clear_bit(reg, reg->info_banks, id);
+        return (reg != NULL) && test_and_clear_bit(reg, reg->info_banks, id);
 }
 bool
 status_reg_is_warning_set(const status_reg_t *reg, uint16_t id)
 {
-        return reg != NULL && is_bit_set(reg, reg->warning_banks, id);
+        return (reg != NULL) && is_bit_set(reg, reg->warning_banks, id);
 }
 bool
 status_reg_is_fault_set(const status_reg_t *reg, uint16_t id)
 {
-        return reg != NULL && is_bit_set(reg, reg->fault_banks, id);
+        return (reg != NULL) && is_bit_set(reg, reg->fault_banks, id);
 }
 bool
 status_reg_is_info_set(const status_reg_t *reg, uint16_t id)
 {
-        return reg != NULL && is_bit_set(reg, reg->info_banks, id);
+        return (reg != NULL) && is_bit_set(reg, reg->info_banks, id);
 }
 
 bool
@@ -312,20 +313,20 @@ status_reg_clear_all(status_reg_t *reg, enum status_class cls)
 uint16_t
 status_reg_last_fault(const status_reg_t *reg)
 {
-        return reg == NULL ? STATUS_UNSET_ID
-                           : STATUS_ATOMIC_LOAD(&reg->last_fault_id);
+        return (reg == NULL) ? STATUS_UNSET_ID
+                             : STATUS_ATOMIC_LOAD(&reg->last_fault_id);
 }
 uint16_t
 status_reg_last_warning(const status_reg_t *reg)
 {
-        return reg == NULL ? STATUS_UNSET_ID
-                           : STATUS_ATOMIC_LOAD(&reg->last_warning_id);
+        return (reg == NULL) ? STATUS_UNSET_ID
+                             : STATUS_ATOMIC_LOAD(&reg->last_warning_id);
 }
 uint16_t
 status_reg_last_info(const status_reg_t *reg)
 {
-        return reg == NULL ? STATUS_UNSET_ID
-                           : STATUS_ATOMIC_LOAD(&reg->last_info_id);
+        return (reg == NULL) ? STATUS_UNSET_ID
+                             : STATUS_ATOMIC_LOAD(&reg->last_info_id);
 }
 
 void
