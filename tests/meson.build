@@ -138,3 +138,34 @@ if add_languages('cpp', required: false)
   )
   test('status c++ header (no-atomics backend)', test_cpp_header_no_atomics_exe)
 endif
+
+# Documentation examples. Every ```c block in README.md, CONTRIBUTING.md, and
+# docs/*.md compiles with the real header, so a stale signature in the docs
+# fails this test. Markers (see CONTRIBUTING.md):
+#   <!-- snippet: body -->  statements, wrapped in a generated function
+#   <!-- snippet: skip -->  pseudo-code that is not meant to compile
+# tests/docs/doc_stubs.h declares the illustrative application symbols.
+test(
+  'docs examples',
+  import('python').find_installation(),
+  args: [
+    files('docs/check_snippets.py'),
+    '--root', meson.project_source_root(),
+    '--lang', 'c',
+    '--prelude', '#include "status.h"',
+    '--prelude', '#include "doc_stubs.h"',
+    '--',
+  ] + meson.get_compiler('c').cmd_array() + [
+    '-std=c11',
+    '-Wall',
+    '-Wextra',
+    '-Wpedantic',
+    '-Werror',
+    '-Wno-unused-function',
+    '-Wno-unused-variable',
+    '-I' + (meson.project_source_root() / 'include'),
+    '-I' + (meson.current_source_dir() / 'docs'),
+    '-c', '{source}', '-o', '{object}',
+  ],
+  timeout: 60,
+)

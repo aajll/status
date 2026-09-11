@@ -40,9 +40,7 @@ gcovr --root . --filter 'src/' --filter 'include/' --print-summary
 
 ## MISRA C:2023
 
-The library is analysed with `misch` (cppcheck-backed MISRA C:2023 analysis),
-configured by `misra.toml`. The audit is clean: `misch run` must report zero
-findings for the default configuration and for both backend profiles:
+The library is analysed with `misch` (cppcheck-backed MISRA C:2023 analysis), configured by `misra.toml`. The audit is clean: `misch run` must report zero findings for the default configuration and for both backend profiles:
 
 ```sh
 misch run
@@ -50,38 +48,17 @@ misch run --profile c11-atomics
 misch run --profile no-atomics
 ```
 
-The default configuration models the GNU `__atomic` backend that GCC and Clang
-builds compile. The profiles force the C11 `<stdatomic.h>` and
-`STATUS_USE_NO_ATOMICS` branches, which the Meson build never selects on its
-own. The analysis target is the 8-bit MCU data model in
-`analysis/mcu8_platform.xml`; `analysis/README.md` explains both.
+The default configuration models the GNU `__atomic` backend that GCC and Clang builds compile. The profiles force the C11 `<stdatomic.h>` and `STATUS_USE_NO_ATOMICS` branches, which the Meson build never selects on its own. The analysis target is the 8-bit MCU data model in `analysis/mcu8_platform.xml`; `analysis/README.md` explains both.
 
 If your change introduces a new finding:
 
-1. Prefer restructuring the code so the rule is satisfied. Deviate only when
-   compliance would make the code genuinely worse, and never restructure purely
-   to hide a violation from the checker; an honest deviation beats evasion.
-2. Suppress at point of use with
-   `/* cppcheck-suppress misra-c2012-<rule> ; @deviation <rationale> */`, or add
-   a justified project-wide entry to `analysis/deviations/misra-deviations.txt`
-   for house-style rules. Use `:file` on a project-wide entry to keep its scope
-   as narrow as practical.
-3. Verify with the three `misch run` commands and `misch deviations` (every
-   suppression must carry a rationale), and justify the deviation in the PR
-   description.
+1. Prefer restructuring the code so the rule is satisfied. Deviate only when compliance would make the code genuinely worse, and never restructure purely to hide a violation from the checker; an honest deviation beats evasion.
+2. Suppress at point of use with `/* cppcheck-suppress misra-c2012-<rule> ; @deviation <rationale> */`, or add a justified project-wide entry to `analysis/deviations/misra-deviations.txt` for house-style rules. Use `:file` on a project-wide entry to keep its scope as narrow as practical.
+3. Verify with the three `misch run` commands and `misch deviations` (every suppression must carry a rationale), and justify the deviation in the PR description.
 
-`required` and `mandatory` rule deviations face a higher bar than `advisory`.
-The project carries four project-wide rules across five entries, each with its
-rationale in `analysis/deviations/misra-deviations.txt`: 15.5 and 8.7 (advisory
-house style), 2.5 (macros of the unselected configuration branches), and 17.3
-(mandatory, but a cppcheck false positive on compiler atomic builtins, not a
-code defect). Do not add a deviation without explaining why the code cannot
-comply.
+`required` and `mandatory` rule deviations face a higher bar than `advisory`. The project carries four project-wide rules across five entries, each with its rationale in `analysis/deviations/misra-deviations.txt`: 15.5 and 8.7 (advisory house style), 2.5 (macros of the unselected configuration branches), and 17.3 (mandatory, but a cppcheck false positive on compiler atomic builtins, not a code defect). Do not add a deviation without explaining why the code cannot comply.
 
-The baseline files under `analysis/baseline/` are empty: the audit reports zero
-findings, so the gate is zero findings rather than a ratchet. Regenerate a
-baseline only after a deliberate review. Never commit licensed MISRA rule text;
-`analysis/rules/README.md` explains how to supply it locally or in CI.
+The baseline files under `analysis/baseline/` are empty: the audit reports zero findings, so the gate is zero findings rather than a ratchet. Regenerate a baseline only after a deliberate review. Never commit licensed MISRA rule text; `analysis/rules/README.md` explains how to supply it locally or in CI.
 
 ## Tests and coverage
 
@@ -89,6 +66,28 @@ baseline only after a deliberate review. Never commit licensed MISRA rule text;
 - Add a test for every new feature.
 - CI enforces an 80% line / 70% branch coverage gate.
 - Tests live in `tests/test_*.c`.
+- The `docs examples` test compiles every `c` code block in `README.md` and `docs/` against the real header, so a stale signature in the documentation fails the suite. See [Documentation](#documentation) for the markers.
+
+## Documentation
+
+| File | Purpose |
+| --- | --- |
+| `README.md` | Landing page: what it is, the fastest start, and links. Keep it under about 100 lines. |
+| `docs/integration.md` | Requirements, install methods, building, and toolchain selection. |
+| `docs/api.md` | API reference: conventions, configuration, functions, and recipes. |
+| `docs/design.md` | Model, contracts, concurrency, portability, and cost. |
+| `analysis/README.md` | MISRA analysis target model and the backend profiles. |
+| `tests/docs/` | The documentation example test and its declarations-only stubs. |
+| `CHANGELOG.md` | Release history, in Keep a Changelog format. |
+
+Rules:
+
+- One home per fact. Put detail in `docs/`, not in the README, and link to it.
+- `docs/api.md` must change together with the interface in `include/status.h`.
+- `docs/design.md` is the authoritative design record. Record a decision there, not only in a commit message.
+- Code blocks in `README.md` and `docs/` are compiled by the `docs examples` test (`tests/docs/check_snippets.py`), which compiles each document as one source file. A `c` fence is file-level code; put `<!-- snippet: body -->` above it for statements, or `<!-- snippet: skip -->` for pseudo-code that must not compile. Fix a broken example; never use `skip` to hide one.
+- Add a new application symbol used by an example to `tests/docs/doc_stubs.h`.
+- Use British spelling and match the surrounding tone. Do not hard-wrap Markdown prose: write one line per paragraph.
 
 ## Commits
 
