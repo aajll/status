@@ -37,9 +37,9 @@ public_headers = include_directories('include')
 
 install_headers('include/status.h', 'include/status_conf.h', subdir: 'status')
 
-# ── Application core library ───────────────────────────────────────────────────
-# Hardware-agnostic application logic.  Linked by both the application
-# executable and the unit-test suite (which supplies its own platform mocks).
+# ── Core library ───────────────────────────────────────────────────────────────
+# Hardware-agnostic status logic, shared by the unit-test suite and by Meson
+# consumers that link the declared dependency.
 
 library_sources = files('src/status.c')
 
