@@ -39,6 +39,10 @@ cppcheck does not predefine `__GNUC__`, so without `[toolchain].defines` the lad
 
 `deviations/misra-deviations.txt` holds the reviewed project-level suppressions: 15.5 (single point of exit, house style), 8.7 (external linkage of a library API), 2.5 (macros of the unselected configuration branches), and 17.3 (cppcheck does not model `__atomic_*` or the full C11 atomic API, so it reports those calls as implicit declarations). Each entry carries its rationale and is validated by `misch deviations`. Prefer an inline `/* cppcheck-suppress misra-c2012-<rule> ; @deviation <rationale> */` for a single location; see `CONTRIBUTING.md`.
 
+## cppcheck version
+
+`misch` passes the target model to cppcheck as `--platform=<file>`. Only recent cppcheck releases accept a platform file path; Ubuntu 24.04's 2.13 rejects it (verified failing on 2.13, working on 2.17 and later) and aborts with `unrecognized platform` on stdout. misch reports that as `cppcheck failed (exit 1):` with no further detail, because it only reads cppcheck's stderr. Install a current cppcheck before running the commands below; the CI job installs the Homebrew bottle for this reason.
+
 ## Local commands
 
 ```sh

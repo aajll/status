@@ -48,7 +48,7 @@ misch run --profile c11-atomics
 misch run --profile no-atomics
 ```
 
-The default configuration models the GNU `__atomic` backend that GCC and Clang builds compile. The profiles force the C11 `<stdatomic.h>` and `STATUS_USE_NO_ATOMICS` branches, which the Meson build never selects on its own. The analysis target is the 8-bit MCU data model in `analysis/mcu8_platform.xml`; `analysis/README.md` explains both.
+The default configuration models the GNU `__atomic` backend that GCC and Clang builds compile. The profiles force the C11 `<stdatomic.h>` and `STATUS_USE_NO_ATOMICS` branches, which the Meson build never selects on its own. The analysis target is the 8-bit MCU data model in `analysis/mcu8_platform.xml`; `analysis/README.md` explains both. Use a cppcheck that accepts `--platform=<file>` (2.17 or later): Ubuntu 24.04's 2.13 rejects the platform file and aborts, so CI installs a current cppcheck instead.
 
 If your change introduces a new finding:
 
