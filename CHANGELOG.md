@@ -15,6 +15,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Made the internal `STATUS_ATOMIC_INIT` and `STATUS_ATOMIC_FETCH_AND` macros statement-shaped on the GNU and C11 backends, so the assignment result is no longer used as an expression (MISRA 13.4). Behaviour is unchanged; the no-atomics backend already used this form.
 - Added explicit parentheses to mixed-precedence conditions and ternaries (MISRA 12.1), narrowed the intermediate snapshot indices before shifting and encoding (MISRA 10.7 / 10.8), and made the internal bit helpers take a `const` register parameter.
 
+### Fixed
+
+- Fixed the MISRA CI job, which used the cppcheck 2.13 shipped by Ubuntu 24.04. That release rejects the `--platform=<file>` form that `misra.toml` uses and aborts before analysing anything, so the job now installs a current cppcheck and matches a local run.
+
 ## [1.4.0] - 2026-09-04
 
 ### Added
