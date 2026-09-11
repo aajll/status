@@ -2,12 +2,13 @@
  * @file test_status_latch_compose.c
  * @brief The documented active/latched composition must not drop fault history.
  *
- * README.md composes an active register and a latched register so that latch
- * policy stays outside the primitive. The acknowledgement path reads `active`
- * and then clears `latched`, which is a check-then-clear pair. Run without
- * serialisation, a producer can set `active` and then `latched` between those
- * two steps, and the acknowledgement then clears the history the producer has
- * just recorded, leaving an active fault with no latched history.
+ * docs/api.md composes an active register and a latched register so that latch
+ * policy stays outside the primitive; docs/design.md analyses why the lock is
+ * required. The acknowledgement path reads `active` and then clears `latched`,
+ * which is a check-then-clear pair. Run without serialisation, a producer can
+ * set `active` and then `latched` between those two steps, and the
+ * acknowledgement then clears the history the producer has just recorded,
+ * leaving an active fault with no latched history.
  *
  * The documented composition therefore holds one lock across the producer's two
  * writes and across the acknowledgement's check and clear. This test races the

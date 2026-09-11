@@ -15,9 +15,9 @@
  *
  *    The implementation is written with MISRA C:2023 in mind and is intended
  *    to be used in IEC 61508 environments. The codebase is not formally
- *    certified. The one intentional, repository-wide advisory deviation is
- *    Rule 15.5 (single point of exit); guard clauses use early @c return at
- *    API boundaries.
+ *    certified. Every deviation from the guideline is reviewed and carries a
+ *    written rationale: project-level entries and inline suppressions are
+ *    recorded in the repository, so the accepted deviations are auditable.
  *
  *    @anchor status_concurrency
  *    ## Concurrency model and threading contract
@@ -66,9 +66,9 @@
  *    preempt each other.
  *    Interrupt masking protects one core only, not concurrent accesses from
  *    other cores. All atomicity claims below require this backend contract.
- *    The two atomic backends statically assert that bank and tracker storage
- *    is always lock-free on the target. Unsupported targets fail to compile
- *    rather than degrade silently.
+ *    The two atomic backends statically assert that bank storage and the
+ *    error-callback pointer are always lock-free on the target. Unsupported
+ *    targets fail to compile rather than degrade silently.
  */
 
 #ifndef STATUS_H

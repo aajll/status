@@ -1,8 +1,6 @@
 # MISRA baseline
 
-The audit reports zero MISRA findings, so the committed baselines accept nothing
-and CI gates on a clean run rather than a ratchet. There is one per analysed
-configuration:
+The audit reports zero MISRA findings, so the committed baselines accept nothing and CI gates on a clean run rather than a ratchet. There is one per analysed configuration:
 
 - `misra-baseline.json` - default GNU `__atomic` backend
 - `misra-baseline.c11-atomics.json` - C11 `<stdatomic.h>` profile
@@ -17,5 +15,4 @@ misch baseline --profile no-atomics
 misch run --baseline
 ```
 
-Commit the resulting JSON so CI can reject findings above the accepted counts.
-Regenerate only after a deliberate review; do not edit these files by hand.
+Commit the resulting JSON so CI can reject findings above the accepted counts. Regenerate only after a deliberate review; do not edit these files by hand.
