@@ -4,28 +4,37 @@ status is a small C11 status register library for embedded systems. It tracks fa
 
 ## Getting started
 
-The same commands CI runs, locally:
+Install a C11 compiler and install the Python tools with [uv](https://docs.astral.sh/uv/), as CI does. The MISRA analysis also needs a current `cppcheck` (see [MISRA C:2023](#misra-c2023)). The same commands CI runs, locally:
 
 ```sh
-# Configure with tests + sanitisers (CI default)
-meson setup build --buildtype=debug -Dbuild_tests=true \
-                  -Db_sanitize=address,undefined
+# Python tools
+uv tool install meson
+uv tool install ninja
+uv tool install gcovr
+uv tool install misch
+
+# Configure with tests and sanitisers (CI default)
+meson setup build --buildtype=debug -Dbuild_tests=true -Db_sanitize=address,undefined
 meson compile -C build
 meson test -C build --verbose
 
-# Coverage (CI gate is 80% line + 70% branch). -fprofile-update=atomic keeps
-# gcov's counter increments atomic; without it the multi-threaded tests race on
-# them and gcov aborts the report with negative branch counts (gcc bug 68080).
-meson setup build_cov --buildtype=debug -Dbuild_tests=true \
-                      -Db_coverage=true \
-                      -Dc_args=-fprofile-update=atomic
+# ThreadSanitizer
+meson setup build_tsan --buildtype=debug -Dbuild_tests=true -Db_sanitize=thread
+meson compile -C build_tsan && meson test -C build_tsan
+
+# Coverage (CI gate is 100% line and 98% branch for src/ and include/).
+# -fprofile-update=atomic keeps gcov's counters consistent under the threaded tests.
+meson setup build_cov --buildtype=debug -Dbuild_tests=true -Db_coverage=true -Dc_args=-fprofile-update=atomic
 meson compile -C build_cov && meson test -C build_cov
 gcovr --root . --filter 'src/' --filter 'include/' --print-summary
+
+# Formatting (pinned clang-format through uvx)
+scripts/format.sh --fix
 ```
 
 ## Source style
 
-- `.clang-format` is mandatory. Run `clang-format -i` on every modified `.c` / `.h` file before submitting.
+- Formatting is mandatory. Run `scripts/format.sh --fix` before submitting, or `scripts/format.sh` to check without writing, as CI does. The script pins the clang-format release and runs it through `uvx`, so an editor formatter gives the same result only when it runs the same release.
 - 8-space indent, Linux brace style, 80-column limit. Match the existing conventions; do not reformat unrelated code.
 - The Meson build system is the single source of truth. Update `meson.build` / `tests/meson.build` when adding or removing source files.
 - No CMake, no Make, no other build systems.
@@ -64,7 +73,7 @@ The baseline files under `analysis/baseline/` are empty: the audit reports zero 
 
 - Add a test for every bug fix.
 - Add a test for every new feature.
-- CI enforces an 80% line / 70% branch coverage gate.
+- CI enforces 100% line and 98% branch coverage of `src/` and `include/`.
 - Tests live in `tests/test_*.c`.
 - The `docs examples` test compiles every `c` code block in `README.md` and `docs/` against the real header, so a stale signature in the documentation fails the suite. See [Documentation](#documentation) for the markers.
 
@@ -106,7 +115,7 @@ Keep the subject under ~70 characters. Use the body to explain _why_ the change 
 
 - Open an issue first for non-trivial changes so the design can be agreed before implementation.
 - Keep PRs focused. One feature or one fix per PR.
-- All CI checks must pass: tests under ASan + UBSan, ThreadSanitizer, release build, coverage gate, and the MISRA audit.
+- All CI checks must pass: tests under ASan + UBSan, ThreadSanitizer, release build, the TI C2000 cross-build, clang-format, coverage gate, and the MISRA audit.
 
 ## When in doubt
 

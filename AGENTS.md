@@ -4,7 +4,8 @@
 
 ## 1) Project-specific instructions
 
-**Project:** `status` **Primary goal:** A lightweight C11 status register library for embedded systems.
+**Project:** `status`
+**Primary goal:** A lightweight C11 status register library for embedded systems, with atomic single-bit updates and no allocation.
 
 ### 1.1 Essential commands
 
@@ -23,21 +24,49 @@ meson compile -C build
 meson test -C build --verbose
 ```
 
-#### Notes
+#### MISRA C:2023 (needs a configured build for `compile_commands.json`)
 
-- `meson setup` generates the optional `status_version.h` into the **build directory**
+```sh
+misch run
+misch run --profile c11-atomics
+misch run --profile no-atomics
+misch deviations
+```
+
+#### Formatting (pinned clang-format through `uvx`)
+
+```sh
+scripts/format.sh          # check, as CI does
+scripts/format.sh --fix    # rewrite in place
+```
+
+### 1.2 Notes
+
+- `meson setup` generates the optional `status_version.h` into the build directory.
+- The MISRA analysis needs cppcheck 2.17 or later, because older releases reject the platform file in `misra.toml`.
 
 ---
 
-## 2) CI / source of truth
+## 2) Non-negotiable design invariants
+
+- A status ID is a `uint16_t` with the bank in the high 12 bits and the bit in the low 4. `NUM_STATUS_BANKS` stays in 1 to 4095, so `STATUS_UNSET_ID` (`0xFFFF`) can never be a valid ID.
+- A single-bit set or clear is one atomic read-modify-write on the bank word. A set writes the bank and then the tracker; a clear never touches the tracker.
+- The atomic backends keep their static assertions that the bank word and the callback pointer are always lock-free. Never let an access fall through to libatomic.
+- On `STATUS_USE_NO_ATOMICS`, every bank and tracker access runs inside the critical-section hooks, and the hooks are defined together or not at all.
+- Invalid input is non-fatal: report through the error callback and return. A `NULL` register is silent. No operation allocates, blocks, or loops over more than `NUM_STATUS_BANKS` words.
+
+---
+
+## 3) CI / source of truth
 
 - CI definitions live in `.github/workflows/ci.yml`.
 - Prefer running the same commands locally as CI runs (see §1.1 above).
-- If `pre-commit` is configured, run `pre-commit run --all-files` before committing.
+- Install Python tools (Meson, Ninja, gcovr, misch) with `uv tool install`, never `pip`; CI does the same through `astral-sh/setup-uv`.
+- The CI jobs are: tests under ASan/UBSan, ThreadSanitizer, a release build, a TI C2000 cross-build (CGT 22.6.2 and 25.11.1, COFF and EABI, warnings as errors), `clang-format`, a 100 percent line and 98 percent branch coverage gate, and `misch` with zero findings on all three backends.
 
 ---
 
-## 3) Docs / commit conventions
+## 4) Docs / commit conventions
 
 ### Documentation layout
 
@@ -56,7 +85,7 @@ meson test -C build --verbose
 
 ---
 
-## 4) C style expectations
+## 5) C style expectations
 
 ### Build & configuration
 
@@ -65,7 +94,7 @@ meson test -C build --verbose
 
 ### Formatting
 
-- `.clang-format` is present and **mandatory**. Run `clang-format -i` on all modified `.c` / `.h` files before committing.
+- `.clang-format` is present and **mandatory**. Run `scripts/format.sh --fix` before committing. It runs the clang-format release pinned in the script through `uvx`. Do not use a system `clang-format`: another release can format the same code differently.
 - Do not reformat unrelated code.
 - Key settings: 8-space indent, `BreakBeforeBraces: Linux`, column limit 80.
 
@@ -74,7 +103,7 @@ meson test -C build --verbose
 - Match conventions in the existing files (indentation, braces, naming).
 - Validate pointer arguments at every public API boundary.
 - No heap allocation (`malloc` / `free` / VLAs).
-- Use `uint32_t`, `uint16_t`, `int16_t`, `bool` from `<stdint.h>` / `<stdbool.h>` — never plain `int` for fixed-width fields.
+- Use `uint32_t`, `uint16_t`, `int16_t`, `bool` from `<stdint.h>` / `<stdbool.h>`; never plain `int` for fixed-width fields.
 
 ### Error handling
 
@@ -86,12 +115,13 @@ meson test -C build --verbose
 - Inline trailing annotations (`/**< ... */`) on `enum`/`struct` members are allowed only when the resulting line fits the 80-column limit.
 - If any member's annotation would overrun, move **all** of that aggregate's member docs into a single structured Doxygen block above the type, as an `@details` list of `- ::SYMBOL  description` entries.
 - Never mix inline and block forms within one aggregate, and never leave a trailing comment that clang-format would wrap onto a second line.
-- After editing, verify with a `clang-format --style=file` no-reformat diff and an 80-column scan.
+- After editing, run `scripts/format.sh` and an 80-column scan.
 
 ### Testing
 
 - Run `meson test -C build` after every change.
 - Add a test case for each bug fix.
 - Tests live in `tests/test_*.c`; all tests must pass.
+- Keep `src/` and `include/` at the coverage gate (100 percent line, 98 percent branch).
 
 ---

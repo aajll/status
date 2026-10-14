@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: MIT
+ *
  * @file test_status_mt.c
  * @brief Concurrent lost-update detection for the atomic bit operations.
  *

@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: MIT
+ *
  * @file test_status_latch_compose.c
  * @brief The documented active/latched composition must not drop fault history.
  *
