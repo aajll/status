@@ -81,4 +81,6 @@ The snippet is CMSIS-specific, so it is illustrative; adapt it to your target's 
 
 ## Cross builds and validation
 
-The library is data-model independent: it uses only `uint16_t`, `size_t`, and `bool`, and its correctness does not depend on the host's `int` width. The project does not ship a cross-build matrix. When you cross-compile, you own the memory model, the atomic availability, and the critical-section hooks. Record the results with your own toolchain; the repository's own verification is described in [docs/design.md](design.md#verification).
+The library is data-model independent: it uses only `uint16_t`, `size_t`, and `bool`, and its correctness does not depend on the host's `int` width. No cross file ships with this project. When you cross-compile, you own the memory model, the atomic availability, and the critical-section hooks.
+
+CI compiles the library with warnings as errors using two releases of a vendor C11 compiler for a 16-bit-MAU DSP target, where `CHAR_BIT` is 16, under both of its object formats. That compiler has no C11 atomics, so the header selects `STATUS_USE_NO_ATOMICS`. These results cover the source dialect and type assumptions only; linking, execution, interrupt masking, and the final map-file footprint remain checks for the consumer. The repository's own verification is described in [docs/design.md](design.md#verification).

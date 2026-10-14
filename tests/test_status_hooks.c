@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: MIT
+ *
  * @file test_status_hooks.c
  * @brief Critical-section coverage for the no-atomics backend.
  */

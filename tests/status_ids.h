@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: MIT
+ *
  * @file: status_ids.h (example)
  * @brief Example definition file for application-specific status IDs.
  *

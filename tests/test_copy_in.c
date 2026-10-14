@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: MIT
+ *
  * @file test_copy_in.c
  * @brief Consumer smoke test for copied-source installation.
  */

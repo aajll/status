@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: MIT
+ *
  * @file status_critical_hooks.h
  * @brief Instrumented critical-section hooks for no-atomics tests.
  */

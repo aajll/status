@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: MIT
+ *
  * @file status_test.h
  * @brief Minimal assert-based test harness shared by the status tests.
  */

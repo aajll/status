@@ -9,9 +9,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - MISRA C:2023 analysis with `misch` (cppcheck-backed), configured by `misra.toml`: a committed `analysis/` scaffold, an 8-bit MCU target data model, and per-backend profiles for the GNU `__atomic`, C11 and `STATUS_USE_NO_ATOMICS` branches. CI runs the audit for all three.
+- A TI C2000 cross-build in CI (CGT 22.6.2 and 25.11.1, COFF and EABI, warnings as errors) and a `clang-format` check through `scripts/format.sh`, which pins the formatter release and runs it with `uvx`.
 
 ### Changed
 
+- CI installs Meson, Ninja, gcovr and misch with `uv` instead of `pip`, and the coverage gate rises to 100% line and 98% branch, the coverage already measured.
 - Restructured the documentation into a short README landing page plus `docs/integration.md`, `docs/api.md`, and `docs/design.md`, added a `docs examples` test that compiles every `c` block in the README and `docs/` against the real header, and stopped hard-wrapping Markdown prose at 80 columns (one line per paragraph).
 - Made the internal `STATUS_ATOMIC_INIT` and `STATUS_ATOMIC_FETCH_AND` macros statement-shaped on the GNU and C11 backends, so the assignment result is no longer used as an expression (MISRA 13.4). Behaviour is unchanged; the no-atomics backend already used this form.
 - Added explicit parentheses to mixed-precedence conditions and ternaries (MISRA 12.1), narrowed the intermediate snapshot indices before shifting and encoding (MISRA 10.7 / 10.8), and made the internal bit helpers take a `const` register parameter.

@@ -72,7 +72,7 @@ An unlocked reader can still observe `active` set while `latched` is clear, beca
 
 The library uses only `uint16_t`, `size_t`, and `bool`, so it does not depend on the host's `int` width and builds for 8-bit MCUs where `int` is 16 bits. It allocates nothing and uses no recursion, `errno`, or exceptions.
 
-The atomic backends require lock-free 16-bit access and a lock-free function pointer. Some cores (for example, some Cortex-M0-class parts) are 32-bit but cannot do a lock-free 16-bit read-modify-write, and some 8-bit targets cannot do an indivisible 16-bit access at all. Those targets select `STATUS_USE_NO_ATOMICS` and supply the hooks; see [docs/integration.md](integration.md#toolchains-without-lock-free-atomics).
+The atomic backends require lock-free 16-bit access and a lock-free function pointer. Some 32-bit cores have no atomic read-modify-write instructions at all, so they cannot do a lock-free 16-bit read-modify-write, and some 8-bit targets cannot do an indivisible 16-bit access at all. Those targets select `STATUS_USE_NO_ATOMICS` and supply the hooks; see [docs/integration.md](integration.md#toolchains-without-lock-free-atomics).
 
 The forced C11 backend is C-only: `STATUS_ATOMIC_QUAL` expands to `_Atomic`, which is not a C++ type qualifier. C++ consumers use the `__atomic` backend or `STATUS_USE_NO_ATOMICS`.
 
@@ -86,4 +86,6 @@ Per-bit set and clear are a single atomic read-modify-write plus, for a set, one
 
 The unit suite drives the whole public API on every backend: the auto-selected default, the forced C11 `<stdatomic.h>` backend, and the forced no-atomics backend, including an instrumented-hooks build that checks that callback-pointer accesses are protected and that the callback runs after the critical section exits. A copied-source smoke test checks that the documented `-D` overrides apply to the header and the implementation alike. Concurrency tests race adjacent bits and the active/latched composition, and the same binaries are rebuilt under ThreadSanitizer.
 
-Static analysis runs with `misch` (cppcheck-backed MISRA C:2023) across all three backends and must report zero findings. Coverage gates are 80% line and 70% branch. The exact commands, the toolchain requirements, and the analysis configuration are in [CONTRIBUTING.md](../CONTRIBUTING.md).
+CI compiles the library source with warnings as errors under TI C2000 Code Generation Tools 22.6.2.LTS and 25.11.1.LTS in C11 C28x mode, under both the COFF and EABI ABIs. That target has a 16-bit MAU, so `uint16_t` is one C byte, and the compiler offers neither `__atomic` builtins nor C11 atomics, so the header selects `STATUS_USE_NO_ATOMICS` with the default no-op hooks. This validates the source dialect and type assumptions only. Linking, target execution, the critical-section hooks, and final map-file footprint remain consumer-owned checks.
+
+Static analysis runs with `misch` (cppcheck-backed MISRA C:2023) across all three backends and must report zero findings. Coverage gates are 100% line and 98% branch. The exact commands, the toolchain requirements, and the analysis configuration are in [CONTRIBUTING.md](../CONTRIBUTING.md).

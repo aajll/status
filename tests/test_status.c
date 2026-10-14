@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: MIT
+ *
  * @file: test_status.c
  * @brief Unit tests for the status module.
  */

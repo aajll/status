@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: MIT
+ *
+ * @file: test_status_reg.c
+ * @brief Unit tests for caller-owned status_reg_t instances.
+ */
+
 #include "status.h"
 #include "status_test.h"
 
