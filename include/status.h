@@ -11,13 +11,12 @@
  *    A banked-bitfield status register: faults, warnings, and info bits are
  *    stored as arrays of 16-bit banks and addressed by compact encoded IDs.
  *
- *    ## MISRA C:2023 / IEC 61508 awareness
+ *    ## MISRA C:2023 awareness
  *
- *    The implementation is written with MISRA C:2023 in mind and is intended
- *    to be used in IEC 61508 environments. The codebase is not formally
- *    certified. Every deviation from the guideline is reviewed and carries a
- *    written rationale: project-level entries and inline suppressions are
- *    recorded in the repository, so the accepted deviations are auditable.
+ *    The implementation is written with MISRA C:2023 in mind. Every deviation
+ *    from the guideline is reviewed and carries a written rationale:
+ *    project-level entries and inline suppressions are recorded in the
+ *    repository, so the accepted deviations are auditable.
  *
  *    @anchor status_concurrency
  *    ## Concurrency model and threading contract
