@@ -106,7 +106,7 @@ Keep the subject under ~70 characters. Use the body to explain _why_ the change 
 
 - Open an issue first for non-trivial changes so the design can be agreed before implementation.
 - Keep PRs focused. One feature or one fix per PR.
-- All CI checks must pass: tests on Linux + macOS, ASan + UBSan, ThreadSanitizer, release build, coverage gate, and the MISRA audit.
+- All CI checks must pass: tests under ASan + UBSan, ThreadSanitizer, release build, coverage gate, and the MISRA audit.
 
 ## When in doubt
 
