@@ -54,7 +54,7 @@ meson compile -C build
 meson test -C build
 ```
 
-`meson setup` generates `status_version.h` in the build directory. For the contributor workflow, including sanitisers, coverage, and the MISRA analysis, see [CONTRIBUTING.md](../CONTRIBUTING.md).
+`status.h` defines the version macros described in [api.md](api.md#version). For the contributor workflow, including sanitisers, coverage, and the MISRA analysis, see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## Toolchains without lock-free atomics
 

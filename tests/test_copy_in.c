@@ -11,6 +11,7 @@
 #include <stdlib.h>
 
 #include "status.h"
+#include "status_version.h"
 
 #define TEST_ASSERT(expr)                                                      \
         do {                                                                   \
@@ -29,6 +30,11 @@ main(void)
         status_init();
         status_set_fault(id);
         TEST_ASSERT(status_is_fault_set(id));
+        TEST_ASSERT(STATUS_VERSION_NUMBER
+                    == ((STATUS_VERSION_MAJOR * 10000L)
+                        + (STATUS_VERSION_MINOR * 100L)
+                        + STATUS_VERSION_PATCH));
+        TEST_ASSERT(STATUS_VERSION_STRING[0] != '\0');
 
         return EXIT_SUCCESS;
 }

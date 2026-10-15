@@ -260,3 +260,25 @@ static void loud_error_handler(status_err_t err, uint16_t id)
 ```
 
 Production can replace it with a nonfatal diagnostic handler or deregister it with `status_set_err_callback(NULL)`.
+
+## Version
+
+`status.h` defines the release it belongs to, so a copied-in header still identifies itself:
+
+<!-- snippet: skip -->
+```c
+#define STATUS_VERSION_MAJOR 1
+#define STATUS_VERSION_MINOR 4
+#define STATUS_VERSION_PATCH 0
+#define STATUS_VERSION "1.4.0"
+```
+
+`STATUS_VERSION_NUMBER` is `MAJOR * 10000 + MINOR * 100 + PATCH` as a `long`, so it holds any version where `int` is 16 bits. Compare it in the preprocessor to require a minimum release:
+
+```c
+#if STATUS_VERSION_NUMBER < 10400L
+#error "status 1.4.0 or later is required"
+#endif
+```
+
+`STATUS_VERSION_STRING` is the same string as `STATUS_VERSION`. `status_version.h` is a deprecated header that includes `status.h`, kept so existing includes compile until the next major release.

@@ -2,6 +2,7 @@ project(
   'status',
   'c',
   version: '1.4.0',
+  meson_version: '>=0.57.0',
   default_options: [
     'c_std=c11',
     'warning_level=3',
@@ -9,33 +10,38 @@ project(
   license: 'MIT',
 )
 
-# ── Version header ─────────────────────────────────────────────────────────────
+# ── Version ────────────────────────────────────────────────────────────────────
+# include/status.h defines the version macros, so a copy-in build has them.
+# Configuration fails when they differ from the project version.
 
-ver = meson.project_version().split('.')
-
-major = ver[0].to_int()
-minor = ver[1].to_int()
-patch = ver[2].to_int()
-
-conf = configuration_data()
-conf.set_quoted('VERSION', meson.project_version())
-conf.set('MAJOR', major)
-conf.set('MINOR', minor)
-conf.set('PATCH', patch)
-
-configure_file(
-  input: 'config' / 'status_version.h.in',
-  output: 'status_version.h',
-  configuration: conf,
-  install: true,
-  install_dir: get_option('includedir') / 'status',
-)
+fs = import('fs')
+version_parts = meson.project_version().split('.')
+version_macros = {
+  'STATUS_VERSION_MAJOR': version_parts[0],
+  'STATUS_VERSION_MINOR': version_parts[1],
+  'STATUS_VERSION_PATCH': version_parts[2],
+  'STATUS_VERSION': '"' + meson.project_version() + '"',
+}
+header_lines = []
+foreach line : fs.read('include' / 'status.h').split('\n')
+  header_lines += ' '.join(line.split())
+endforeach
+foreach name, value : version_macros
+  if '#define @0@ @1@'.format(name, value) not in header_lines
+    error('include/status.h must define @0@ as @1@'.format(name, value))
+  endif
+endforeach
 
 # ── Include directories ────────────────────────────────────────────────────────
 
 public_headers = include_directories('include')
 
-install_headers('include/status.h', 'include/status_conf.h', subdir: 'status')
+install_headers(
+  'include/status.h',
+  'include/status_conf.h',
+  'include/status_version.h',
+  subdir: 'status',
+)
 
 # ── Core library ───────────────────────────────────────────────────────────────
 # Hardware-agnostic status logic, shared by the unit-test suite and by Meson

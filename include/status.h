@@ -86,6 +86,29 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 
+/* ================ VERSION ================================================= */
+
+/**
+ * @name Version
+ * @brief Release of this header, for diagnostics and @c #if checks.
+ *
+ * @details
+ *    @c STATUS_VERSION_NUMBER is @c MAJOR*10000 @c + @c MINOR*100 @c + @c PATCH
+ *    with type @c long, so it cannot overflow where @c int is 16 bits. The
+ *    Meson build fails to configure when these values differ from the
+ *    project version.
+ * @{
+ */
+#define STATUS_VERSION_MAJOR  1
+#define STATUS_VERSION_MINOR  4
+#define STATUS_VERSION_PATCH  0
+#define STATUS_VERSION        "1.4.0"
+#define STATUS_VERSION_STRING STATUS_VERSION
+#define STATUS_VERSION_NUMBER                                                  \
+        ((STATUS_VERSION_MAJOR * 10000L) + (STATUS_VERSION_MINOR * 100L)       \
+         + STATUS_VERSION_PATCH)
+/** @} */
+
 /* ================ DEFINES ================================================= */
 
 /* ---------------  Configuration ------------------------------------------- */
