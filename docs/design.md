@@ -74,8 +74,6 @@ The library uses only `uint16_t`, `size_t`, and `bool`, so it does not depend on
 
 The atomic backends require lock-free 16-bit access and a lock-free function pointer. Some 32-bit cores have no atomic read-modify-write instructions at all, so they cannot do a lock-free 16-bit read-modify-write, and some 8-bit targets cannot do an indivisible 16-bit access at all. Those targets select `STATUS_USE_NO_ATOMICS` and supply the hooks; see [docs/integration.md](integration.md#toolchains-without-lock-free-atomics).
 
-The forced C11 backend is C-only: `STATUS_ATOMIC_QUAL` expands to `_Atomic`, which is not a C++ type qualifier. C++ consumers use the `__atomic` backend or `STATUS_USE_NO_ATOMICS`.
-
 ## Performance and cost
 
 Storage is fixed at compile time. For one register the bank arrays cost `3 * NUM_STATUS_BANKS * sizeof(uint16_t)` bytes and the three trackers cost `3 * sizeof(uint16_t)`. With the default `NUM_STATUS_BANKS = 12` that is 72 bytes of banks plus 6 bytes of trackers, then the callback pointer and any padding to the pointer's alignment: 80 bytes where a pointer is 16-bit, and 84 bytes on a 32-bit target, where the 6 tracker bytes are padded to the pointer's 4-byte alignment. The singleton adds one more such struct.

@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Removed
 
 - `status_version.h`. `status.h` defines the version macros.
+- The `extern "C"` guards in `status.h`. The library is C11 only and its headers make no C++ claim. `STATUS_STATIC_ASSERT` always expands to `_Static_assert`, and the C++17 header tests and C++ consumer notes are removed.
 
 ### Fixed
 

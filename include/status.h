@@ -73,11 +73,6 @@
 #ifndef STATUS_H
 #define STATUS_H
 
-/* Add C bindings if being compiled with C++ compiler */
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /* ================ INCLUDES ================================================ */
 
 #include "status_conf.h"
@@ -202,23 +197,13 @@ typedef struct {
 
 /**
  * @def STATUS_STATIC_ASSERT
- * @brief Compile-time assertion that compiles as both C11 and C++17.
+ * @brief Compile-time assertion.
  *
  * @param condition  Constant expression that must hold.
  * @param message    String literal reported when it does not.
- *
- * @details C++ spells the keyword `static_assert`; C11 spells it
- * `_Static_assert`. Routing both through one macro keeps the public header
- * compilable as both C11 and C++17. The project targets C11, so the non-C++
- * branch can rely on `_Static_assert` being available.
  */
-#if defined(__cplusplus)
-#define STATUS_STATIC_ASSERT(condition, message)                               \
-        static_assert(condition, message)
-#else
 #define STATUS_STATIC_ASSERT(condition, message)                               \
         _Static_assert(condition, message)
-#endif
 
 #if defined(STATUS_USE_GNU_ATOMICS)
 /* __atomic_always_lock_free is a compile-time constant but not a "standard"
@@ -1007,10 +992,5 @@ uint16_t status_last_info(void);
  *       - @p len == 0     → STATUS_ERR_INVALID_LEN
  */
 void status_snapshot(enum status_class cls, uint16_t *dst, size_t len);
-
-/* End of C bindings for C++ compilers */
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* STATUS_H */
