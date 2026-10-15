@@ -281,4 +281,4 @@ Production can replace it with a nonfatal diagnostic handler or deregister it wi
 #endif
 ```
 
-`STATUS_VERSION_STRING` is the same string as `STATUS_VERSION`. `status_version.h` is a deprecated header that includes `status.h`, kept so existing includes compile until the next major release.
+`STATUS_VERSION_STRING` is the same string as `STATUS_VERSION`.
