@@ -11,7 +11,6 @@
 #include <stdlib.h>
 
 #include "status.h"
-#include "status_version.h"
 
 #define TEST_ASSERT(expr)                                                      \
         do {                                                                   \

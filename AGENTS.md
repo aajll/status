@@ -42,7 +42,7 @@ scripts/format.sh --fix    # rewrite in place
 
 ### 1.2 Notes
 
-- `include/status.h` defines the version macros, and `meson setup` fails when they differ from `project(version:)`, so a release updates both. `include/status_version.h` is a deprecated header that includes `status.h`.
+- `include/status.h` defines the version macros, and `meson setup` fails when they differ from `project(version:)`, so a release updates both.
 - The MISRA analysis needs cppcheck 2.17 or later, because older releases reject the platform file in `misra.toml`.
 
 ---

@@ -39,7 +39,6 @@ public_headers = include_directories('include')
 install_headers(
   'include/status.h',
   'include/status_conf.h',
-  'include/status_version.h',
   subdir: 'status',
 )
 
