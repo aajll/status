@@ -4,7 +4,7 @@ How to add `status` to a firmware project and build it. This guide covers requir
 
 ## Requirements
 
-- A C11 compiler for the library. C++17 consumers can use the header through `extern "C"`, with the limits in [C++ consumers](#c-consumers).
+- A C11 compiler. The header is C only.
 - One of:
 - GCC or Clang with the `__atomic` builtins (the auto-discovered default), or
 - a C11 toolchain with `<stdatomic.h>`, or
@@ -74,10 +74,6 @@ The hooks must **save and restore** interrupt state, not unconditionally re-enab
 ```
 
 The snippet is CMSIS-specific, so it is illustrative; adapt it to your target's interrupt API. The full contract for the no-atomics backend is in [docs/design.md](design.md#concurrency).
-
-## C++ consumers
-
-`status.h` is wrapped in `extern "C"` and compiles as C++17 with the auto-discovered backend (GNU/Clang `__atomic`) or with `STATUS_USE_NO_ATOMICS`. The forced `STATUS_USE_C11_ATOMICS` backend is **C-only**: `STATUS_ATOMIC_QUAL` expands to `_Atomic`, which is not a C++ type qualifier even in C++23. A C++ translation unit that cannot use `__atomic` builtins must select `STATUS_USE_NO_ATOMICS` and supply the critical-section hooks above.
 
 ## Cross builds and validation
 
