@@ -1,5 +1,12 @@
 thread_dep = dependency('threads')
 
+# The project registers status_dep under its pkg-config name, so any project in
+# the build resolves dependency('status') to it without a fallback.
+assert(
+  dependency('status', allow_fallback: false).type_name() == 'internal',
+  'dependency(\'status\') must resolve to the registered status_dep',
+)
+
 # Single-threaded behavioural suite on the auto-selected backend (the
 # GCC/Clang __atomic path by default).
 test_exe = executable(
