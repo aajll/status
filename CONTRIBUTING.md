@@ -22,7 +22,7 @@ meson test -C build --verbose
 meson setup build_tsan --buildtype=debug -Dbuild_tests=true -Db_sanitize=thread
 meson compile -C build_tsan && meson test -C build_tsan
 
-# Coverage (CI gate is 100% line and 98% branch for src/ and include/).
+# Coverage (CI gate is 100% line and branch for src/ and include/).
 # -fprofile-update=atomic keeps gcov's counters consistent under the threaded tests.
 meson setup build_cov --buildtype=debug -Dbuild_tests=true -Db_coverage=true -Dc_args=-fprofile-update=atomic
 meson compile -C build_cov && meson test -C build_cov
@@ -73,7 +73,7 @@ The baseline files under `analysis/baseline/` are empty: the audit reports zero 
 
 - Add a test for every bug fix.
 - Add a test for every new feature.
-- CI enforces 100% line and 98% branch coverage of `src/` and `include/`.
+- CI enforces 100% line and branch coverage of `src/` and `include/`.
 - Tests live in `tests/test_*.c`.
 - The `docs examples` test compiles every `c` code block in `README.md` and `docs/` against the real header, so a stale signature in the documentation fails the suite. See [Documentation](#documentation) for the markers.
 

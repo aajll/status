@@ -138,7 +138,9 @@ main(void)
         status_reg_set_warning(&a, warning);
         status_reg_set_info(&a, info);
         TEST_ASSERT(status_reg_test_and_clear_warning(&a, warning));
+        TEST_ASSERT(!status_reg_test_and_clear_warning(&a, warning));
         TEST_ASSERT(status_reg_test_and_clear_info(&a, info));
+        TEST_ASSERT(!status_reg_test_and_clear_info(&a, info));
 
         status_reg_set_fault(&a, fault);
         status_reg_clear_all(&a, STATUS_CLASS_FAULT);
