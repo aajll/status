@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 thread_dep = dependency('threads')
 
 # The project registers status_dep under its pkg-config name, so any project in
