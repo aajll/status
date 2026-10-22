@@ -95,9 +95,9 @@
  * @{
  */
 #define STATUS_VERSION_MAJOR  1
-#define STATUS_VERSION_MINOR  4
+#define STATUS_VERSION_MINOR  5
 #define STATUS_VERSION_PATCH  0
-#define STATUS_VERSION        "1.4.0"
+#define STATUS_VERSION        "1.5.0"
 #define STATUS_VERSION_STRING STATUS_VERSION
 #define STATUS_VERSION_NUMBER                                                  \
         ((STATUS_VERSION_MAJOR * 10000L) + (STATUS_VERSION_MINOR * 100L)       \
