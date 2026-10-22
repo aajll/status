@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # ── Build personality ──────────────────────────────────────────────────────────
 # By default tests are disabled. Enable them with -Dbuild_tests=true.
 option(

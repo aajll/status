@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: MIT
+ *
  * @file doc_stubs.h
  * @brief Declarations-only stubs for the documentation examples.
  *
