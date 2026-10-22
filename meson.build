@@ -59,6 +59,7 @@ status_dep = declare_dependency(
   include_directories: public_headers,
   link_with: status_lib,
 )
+meson.override_dependency('status', status_dep)
 
 # ── pkg-config ─────────────────────────────────────────────────────────────────
 

@@ -39,7 +39,7 @@ Add the repository as a wrap dependency or subproject, then use the declared dep
 status_dep = dependency('status', fallback : ['status', 'status_dep'])
 ```
 
-Meson also generates pkg-config metadata, so non-Meson consumers can use the installed package. Configuration macros (see [docs/api.md](api.md#configuration)) must be defined consistently for the library and for every translation unit that includes `status.h`.
+Once the subproject is configured it registers `status_dep` as `status`, so other subprojects in the same build get it from `dependency('status')` without a fallback. Meson also generates pkg-config metadata, so non-Meson consumers can use the installed package. Configuration macros (see [docs/api.md](api.md#configuration)) must be defined consistently for the library and for every translation unit that includes `status.h`.
 
 ## Building from source
 
